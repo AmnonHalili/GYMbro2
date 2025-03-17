@@ -1,0 +1,140 @@
+openapi: 3.0.0
+info:
+  title: GYMbro2 API
+  description: API documentation for GYMbro2 - Health and Fitness Platform
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000
+    description: Development server
+tags:
+  - name: Auth
+    description: Authentication endpoints
+  - name: Users
+    description: User management endpoints
+  - name: Posts
+    description: Post management endpoints
+  - name: Comments
+    description: Comment management endpoints
+  - name: Likes
+    description: Like management endpoints
+  - name: AI
+    description: AI integration endpoints
+paths:
+  /api/auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Register a new user
+      description: Create a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - email
+                - password
+              properties:
+                username:
+                  type: string
+                  example: johndoe
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                password:
+                  type: string
+                  format: password
+                  example: StrongPassword123
+      responses:
+        '201':
+          description: User registered successfully
+        '400':
+          description: Invalid input
+        '409':
+          description: User already exists
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Login
+      description: Authenticate user and get tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                password:
+                  type: string
+                  format: password
+                  example: StrongPassword123
+      responses:
+        '200':
+          description: Login successful
+        '401':
+          description: Invalid credentials
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 5f8d0f3555b9d333d4b2f2e3
+        username:
+          type: string
+          example: johndoe
+        email:
+          type: string
+          example: john@example.com
+        profilePicture:
+          type: string
+          example: /uploads/profile/user123.jpg
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Post:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 5f8d0f3555b9d333d4b2f2e3
+        user:
+          $ref: '#/components/schemas/User'
+        content:
+          type: string
+          example: My workout today was amazing!
+        image:
+          type: string
+          example: /uploads/posts/post123.jpg
+        likesCount:
+          type: integer
+          example: 15
+        commentsCount:
+          type: integer
+          example: 3
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT 
