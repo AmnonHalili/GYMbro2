@@ -152,6 +152,8 @@ service-account.json
 **/secrets.yml
 **/credentials.yaml
 **/credentials.yml
+**/config.json
+**/secrets.json
 
 # Database files
 *.sql
@@ -241,3 +243,7 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+server/.env
+server/.env.example
+client/.env
+client/.env.example
