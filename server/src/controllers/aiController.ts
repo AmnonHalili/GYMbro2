@@ -59,9 +59,9 @@ const validateApiKey = (): boolean => {
     console.error('[aiController] API key is missing completely');
     return false;
   }
-
+  
   console.log(`[aiController] ${AI_PROVIDER} API key validation check - key exists`);
-
+  
   // החזרת תקינות
   return true;
 };
@@ -205,10 +205,10 @@ export const generateWorkoutPlan = async (req: Request, res: Response): Promise<
         });
       } catch (fallbackError) {
         // אם גם השימוש בתוכנית המוכנה נכשל, נחזיר את השגיאה
-        res.status(500).json({ 
-          message: 'Error generating workout plan',
-          error: process.env.NODE_ENV === 'production' ? 'Internal server error' : String(error)
-        });
+      res.status(500).json({ 
+        message: 'Error generating workout plan',
+        error: process.env.NODE_ENV === 'production' ? 'Internal server error' : String(error)
+      });
       }
     }
   }
@@ -608,13 +608,13 @@ async function callAI({ prompt }: { prompt: string }, maxRetries: number = 2): P
       console.error(`[aiController] AI API call error (attempt ${attempts + 1}):`, error);
       
       // בדיקה אם כדאי לנסות שוב
-      attempts++;
-      
-      if (attempts <= maxRetries) {
-        console.log(`[aiController] Retrying AI call in ${attempts * 1000}ms...`);
-        // המתנה לפני ניסיון נוסף
-        await new Promise(resolve => setTimeout(resolve, attempts * 1000));
-        continue;
+          attempts++;
+          
+          if (attempts <= maxRetries) {
+            console.log(`[aiController] Retrying AI call in ${attempts * 1000}ms...`);
+            // המתנה לפני ניסיון נוסף
+            await new Promise(resolve => setTimeout(resolve, attempts * 1000));
+            continue;
       }
       
       // לא נוכל לנסות שוב, זורקים את השגיאה האחרונה
