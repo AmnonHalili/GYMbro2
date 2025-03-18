@@ -1,251 +1,101 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FaUser, FaEnvelope, FaLock, FaUserPlus, FaSignInAlt } from 'react-icons/fa';
 import { jwtDecode } from 'jwt-decode';
+import RegisterForm from '../components/RegisterForm';
 
-// Google OAuth Client ID
+// Google OAuth Client ID מה-.env או קבוע
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 
-const Register: React.FC = () => {
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { state, register, googleLogin, clearError } = useAuth();
-  const { isAuthenticated, error } = state;
-  const navigate = useNavigate();
+interface GoogleCredential {
+  email: string;
+  name: string;
+  picture: string;
+  sub: string;
+}
 
-  // Redirect if already authenticated
+const Register: React.FC = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const { authState, register, googleLogin } = useAuth();
+  const { isAuthenticated, error: authError } = authState;
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  const error = localError || authError;
+  
+  // אם המשתמש כבר מחובר, הפנה לדף הבית
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/');
+      const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+      navigate(from);
     }
-
-    return () => {
-      clearError();
-    };
-  }, [isAuthenticated, navigate, clearError]);
-
-  // Check if passwords match
-  useEffect(() => {
-    if (confirmPassword && password !== confirmPassword) {
-      setPasswordError('הסיסמאות אינן תואמות');
-    } else {
-      setPasswordError(null);
-    }
-  }, [password, confirmPassword]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (password !== confirmPassword) {
-      setPasswordError('הסיסמאות אינן תואמות');
+  }, [isAuthenticated, navigate, location]);
+  
+  // טיפול בשליחת טופס הרשמה
+  const handleSubmit = async (username: string, email: string, password: string) => {
+    if (!username.trim() || !email.trim() || !password.trim()) {
       return;
     }
-
+    
     setIsSubmitting(true);
-
+    
     try {
       await register({ username, email, password });
-      navigate('/');
     } catch (error) {
       console.error('Registration error:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // Google Login Success Handler
-  const handleGoogleLoginSuccess = async (credentialResponse: any) => {
-    try {
-      // פענוח הטוקן שהתקבל מגוגל
-      const decoded: any = jwtDecode(credentialResponse.credential);
-      console.log('Google login successful, decoded token:', decoded);
-      
-      // קריאה לפונקציית ההתחברות עם גוגל
-      await googleLogin({
-        token: credentialResponse.credential,
-        email: decoded.email,
-        name: decoded.name,
-        picture: decoded.picture,
-        googleId: decoded.sub
-      });
-      
-      // מעבר לדף הבית אחרי ההתחברות
-      if (state.accessToken) {
-        navigate('/');
+  
+  // טיפול בהתחברות באמצעות גוגל
+  const handleGoogleLogin = async (credential: string) => {
+    if (credential) {
+      try {
+        setIsSubmitting(true);
+        setLocalError(''); // ניקוי שגיאות קודמות
+        
+        // פיענוח הטוקן מגוגל (רק לצורכי לוג)
+        try {
+          const decoded = jwtDecode<GoogleCredential>(credential);
+          console.log('Google login token decoded:', {
+            email: decoded.email,
+            hasName: !!decoded.name,
+            hasId: !!decoded.sub
+          });
+        } catch (decodeError) {
+          console.error('Failed to decode Google token on client:', decodeError);
+          // נמשיך בכל זאת - השרת יפענח את הטוקן
+        }
+        
+        // קריאה לפונקציית ההתחברות עם גוגל
+        await googleLogin(credential);
+        
+        // מעבר לדף הבית אחרי ההתחברות
+        const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+        navigate(from);
+      } catch (error: any) {
+        console.error('Google login error in component:', error);
+        setLocalError(error.response?.data?.message || 
+          'התחברות באמצעות Google נכשלה. אנא נסה שוב מאוחר יותר או הירשם באמצעות אימייל וסיסמה.');
+      } finally {
+        setIsSubmitting(false);
       }
-    } catch (error) {
-      console.error('Google login processing error:', error);
+    } else {
+      console.error('No credential provided from Google');
+      setLocalError('לא התקבלה תגובה מ-Google. אנא נסה שוב או הירשם באמצעות אימייל וסיסמה.');
     }
   };
 
-  // הגדר סקריפט Google
-  useEffect(() => {
-    // בדוק שהחלון קיים (מניעת בעיות SSR)
-    if (typeof window === 'undefined' || !window.document || !GOOGLE_CLIENT_ID) return;
-    
-    // בדוק אם הסקריפט כבר נטען
-    if (document.getElementById('google-client-script')) return;
-    
-    // טען את סקריפט Google
-    const script = document.createElement('script');
-    script.id = 'google-client-script';
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    document.body.appendChild(script);
-    
-    // נקה בעת הסרת הקומפוננטה
-    return () => {
-      const scriptTag = document.getElementById('google-client-script');
-      if (scriptTag) {
-        document.body.removeChild(scriptTag);
-      }
-    };
-  }, []);
-
-  // הגדר מאזין אירועים להתחברות Google
-  useEffect(() => {
-    // פונקציה שתופעל כאשר Google מחזיר תוצאה
-    const googleLoginHandler = async (event: any) => {
-      const response = event.detail;
-      if (response && response.credential) {
-        await handleGoogleLoginSuccess(response);
-      }
-    };
-
-    // הוסף מאזין אירועים
-    const pageElement = document.querySelector('div.auth-page');
-    if (pageElement) {
-      pageElement.addEventListener('googleLoginSuccess', googleLoginHandler);
-    }
-
-    // הסר מאזין אירועים בעת ניקוי
-    return () => {
-      if (pageElement) {
-        pageElement.removeEventListener('googleLoginSuccess', googleLoginHandler);
-      }
-    };
-  }, []);
-
   return (
-    <div className="auth-page animate-fade-in">
-      <div className="auth-card">
-        <div className="auth-logo">
-          {FaUserPlus({ className: "auth-icon" })}
-          <h2 className="auth-title">הרשמה</h2>
-        </div>
-
-        {error && <div className="alert alert-danger">{error}</div>}
-
-        {/* Registration Form */}
-        <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-group">
-            <div className="input-icon-wrapper">
-              {FaUser({ className: "input-icon" })}
-              <input
-                type="text"
-                id="username"
-                className="form-control"
-                placeholder="שם משתמש"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <div className="input-icon-wrapper">
-              {FaEnvelope({ className: "input-icon" })}
-              <input
-                type="email"
-                id="email"
-                className="form-control"
-                placeholder="דוא״ל"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <div className="input-icon-wrapper">
-              {FaLock({ className: "input-icon" })}
-              <input
-                type="password"
-                id="password"
-                className="form-control"
-                placeholder="סיסמה"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <div className="input-icon-wrapper">
-              {FaLock({ className: "input-icon" })}
-              <input
-                type="password"
-                id="confirmPassword"
-                className="form-control"
-                placeholder="אימות סיסמה"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
-              {passwordError && <small className="text-danger">{passwordError}</small>}
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={isSubmitting || !!passwordError}
-          >
-            {isSubmitting ? 'נרשם...' : 'הירשם'} {FaUserPlus({})}
-          </button>
-        </form>
-
-        {/* Google Login */}
-        {GOOGLE_CLIENT_ID && (
-          <div className="google-login-container">
-            <div className="or-divider">
-              <span>או</span>
-            </div>
-            
-            <div className="google-btn-wrapper" id="google-login-button">
-              <div id="g_id_onload"
-                data-client_id={GOOGLE_CLIENT_ID}
-                data-callback="handleGoogleSignIn">
-              </div>
-              <div className="g_id_signin"
-                data-type="standard"
-                data-theme="filled_blue"
-                data-size="large"
-                data-text="signup_with"
-                data-shape="rectangular"
-                data-locale="he"
-                data-width="100%">
-              </div>
-            </div>
-          </div>
-        )}
-        
-        <div className="auth-links">
-          <Link to="/login" className="auth-link">
-            {FaSignInAlt({})} כבר יש לך חשבון? התחבר עכשיו
-          </Link>
-        </div>
-      </div>
-    </div>
+    <RegisterForm
+      onSubmit={handleSubmit}
+      onGoogleLogin={handleGoogleLogin}
+      error={error}
+      isSubmitting={isSubmitting}
+      googleClientId={GOOGLE_CLIENT_ID}
+    />
   );
 };
 

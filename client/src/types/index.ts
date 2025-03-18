@@ -1,6 +1,7 @@
 // User types
 export interface User {
   id: string;
+  _id?: string;
   username: string;
   email?: string;
   profilePicture?: string;
@@ -74,18 +75,21 @@ export interface Pagination {
 
 // AI types
 export interface WorkoutPlanRequest {
-  level: string;
-  goal: string;
+  fitnessLevel: 'beginner' | 'intermediate' | 'advanced';
+  goals: string[];
   daysPerWeek: number;
-  preferences?: string;
+  equipment: 'none' | 'minimal' | 'home-gym' | 'gym';
   provider?: 'gemini' | 'openai';
 }
 
 export interface NutritionAdviceRequest {
-  goal: string;
-  dietaryRestrictions?: string;
-  currentWeight: number;
-  targetWeight: number;
+  age: number;
+  weight: number;
+  height: number;
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'high' | 'very_high';
+  dietaryPreferences: 'balanced' | 'vegetarian' | 'vegan' | 'high_protein';
+  healthGoals: 'lose' | 'maintain' | 'gain';
+  existingConditions?: string;
   provider?: 'gemini' | 'openai';
 }
 

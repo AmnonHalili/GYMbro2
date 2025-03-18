@@ -92,59 +92,156 @@ export const getTrendingPosts = async (req: Request, res: Response): Promise<voi
   }
 };
 
-// Create a new post
-export const createPost = async (req: Request, res: Response): Promise<void> => {
-  res.status(200).json({ message: 'Post created successfully' });
-};
-
-// Get post by ID
+// Get a single post by ID
 export const getPostById = async (req: Request, res: Response): Promise<void> => {
-  res.status(200).json({ post: {} });
-};
-
-// Update post
-export const updatePost = async (req: Request, res: Response): Promise<void> => {
   try {
     const { postId } = req.params;
-    const { content } = req.body;
-    const user = req.user as IUser;
-
-    // Validate content
-    if (!content) {
-      res.status(400).json({ message: 'Content is required' });
-      return;
-    }
-
-    // Find the post
-    const post = await Post.findById(postId);
     
-    // Check if post exists
+    const post = await Post.findById(postId).populate('user', 'username profilePicture');
+    
     if (!post) {
       res.status(404).json({ message: 'Post not found' });
       return;
     }
+    
+    res.status(200).json({ post });
+  } catch (error) {
+    console.error('Error fetching post:', error);
+    res.status(500).json({ message: 'Server error while fetching post' });
+  }
+};
 
-    // Check if user is the owner of the post
-    if (post.user && user && post.user.toString() !== user._id?.toString()) {
-      res.status(403).json({ message: 'Not authorized to update this post' });
+// Create a new post
+export const createPost = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // שימוש ב-type assertion לגישה לאובייקט המשתמש
+    const user = (req as any).user;
+    
+    if (!user) {
+      res.status(401).json({ message: 'User not authenticated' });
       return;
     }
+    
+    const { content } = req.body;
+    
+    if (!content) {
+      res.status(400).json({ message: 'Content is required' });
+      return;
+    }
+    
+    const newPost = new Post({
+      content,
+      user: user._id,
+      image: req.file ? `/uploads/posts/${req.file.filename}` : null
+    });
+    
+    await newPost.save();
+    
+    // Populate user data for response
+    await newPost.populate('user', 'username profilePicture');
+    
+    res.status(201).json({
+      message: 'Post created successfully',
+      post: newPost
+    });
+  } catch (error) {
+    console.error('Error creating post:', error);
+    res.status(500).json({ message: 'Server error while creating post' });
+  }
+};
 
-    // Update the post
-    post.content = content;
+// Update an existing post
+export const updatePost = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // שימוש ב-type assertion לגישה לאובייקט המשתמש
+    const user = (req as any).user;
+    const { postId } = req.params;
+    const { content } = req.body;
+    
+    // Find the post
+    const post = await Post.findById(postId);
+    
+    if (!post) {
+      res.status(404).json({ message: 'Post not found' });
+      return;
+    }
+    
+    // Check if the user is the post owner
+    if (post.user.toString() !== user._id.toString()) {
+      res.status(403).json({ message: 'User not authorized to update this post' });
+      return;
+    }
+    
+    // Update post content
+    if (content) {
+      post.content = content;
+    }
+    
+    // Handle image update
+    if (req.file) {
+      // Delete the old image if exists
+      if (post.image) {
+        const oldImagePath = path.join(__dirname, '../../', post.image);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      
+      // Set new image path
+      post.image = `/uploads/posts/${req.file.filename}`;
+    }
+    
     await post.save();
-
-    // Populate user information
     await post.populate('user', 'username profilePicture');
-
-    res.status(200).json(post);
+    
+    res.status(200).json({
+      message: 'Post updated successfully',
+      post
+    });
   } catch (error) {
     console.error('Error updating post:', error);
     res.status(500).json({ message: 'Server error while updating post' });
   }
 };
 
-// Delete post
+// Delete a post
 export const deletePost = async (req: Request, res: Response): Promise<void> => {
-  res.status(200).json({ message: 'Post deleted successfully' });
+  try {
+    // שימוש ב-type assertion לגישה לאובייקט המשתמש
+    const user = (req as any).user;
+    const { postId } = req.params;
+    
+    // Find the post
+    const post = await Post.findById(postId);
+    
+    if (!post) {
+      res.status(404).json({ message: 'Post not found' });
+      return;
+    }
+    
+    // Check if the user is the post owner
+    if (post.user.toString() !== user._id.toString()) {
+      res.status(403).json({ message: 'User not authorized to delete this post' });
+      return;
+    }
+    
+    // Delete image if exists
+    if (post.image) {
+      const imagePath = path.join(__dirname, '../../', post.image);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+    
+    // Delete the post
+    await Post.findByIdAndDelete(postId);
+    
+    res.status(200).json({ 
+      message: 'Post deleted successfully',
+      postId
+    });
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    res.status(500).json({ message: 'Server error while deleting post' });
+  }
 };

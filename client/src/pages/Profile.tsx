@@ -10,8 +10,8 @@ import PostCard from '../components/PostCard';
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId?: string }>();
   const navigate = useNavigate();
-  const { state } = useAuth();
-  const { user: currentUser } = state;
+  const { authState } = useAuth();
+  const { user: currentUser } = authState;
   
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -38,7 +38,7 @@ const Profile: React.FC = () => {
         let userProfile;
         
         // בדיקה האם להציג את הפרופיל של המשתמש המחובר או משתמש אחר
-        if (!userId && state.isAuthenticated && currentUser) {
+        if (!userId && authState.isAuthenticated && currentUser) {
           // הצגת פרופיל אישי כשמחוברים
           userProfile = currentUser;
           console.log('Using current user profile:', userProfile);
@@ -57,7 +57,7 @@ const Profile: React.FC = () => {
             setLoading(false);
             return;
           }
-        } else if (!state.isAuthenticated) {
+        } else if (!authState.isAuthenticated) {
           // אם לא מחוברים וגם לא ביקשו משתמש ספציפי
           console.log('User not authenticated, redirecting to login');
           navigate('/login');
@@ -81,7 +81,7 @@ const Profile: React.FC = () => {
     };
     
     fetchUserProfile();
-  }, [userId, state.isAuthenticated, currentUser, navigate]);
+  }, [userId, authState.isAuthenticated, currentUser, navigate]);
 
   // טעינת הפוסטים של המשתמש - בנפרד מטעינת המשתמש
   useEffect(() => {

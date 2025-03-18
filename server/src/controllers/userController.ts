@@ -8,20 +8,33 @@ import { Types } from 'mongoose';
 // Get current user profile
 export const getCurrentUser = async (req: Request, res: Response) => {
   try {
-    const user = req.user;
-    
-    if (!user) {
+    if (!req.userId) {
+      console.error('[userController] User ID not found in request');
       return res.status(401).json({ message: 'User not authenticated' });
     }
     
+    const userId = req.userId;
+    const user = await User.findById(userId).select('-password');
+    
+    if (!user) {
+      console.error(`[userController] User ${userId} not found in database`);
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    console.log(`[userController] Returning user data for ${user.username || user.email} (${user._id})`);
+    
     res.status(200).json({
-      id: user._id,
-      username: user.username,
-      email: user.email,
-      profilePicture: user.profilePicture
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        profilePicture: user.profilePicture,
+        bio: user.bio || '',
+        createdAt: user.createdAt
+      }
     });
   } catch (error) {
-    console.error('Get current user error:', error);
+    console.error('[userController] Get current user error:', error);
     res.status(500).json({ message: 'Server error while fetching user profile' });
   }
 };
@@ -60,7 +73,8 @@ export const getUserByUsername = async (req: Request, res: Response) => {
     res.status(200).json({
       id: user._id,
       username: user.username,
-      profilePicture: user.profilePicture
+      profilePicture: user.profilePicture,
+      bio: user.bio
     });
   } catch (error) {
     console.error('Get user by username error:', error);
@@ -114,11 +128,13 @@ export const getUserPosts = async (req: Request, res: Response) => {
 // Update user profile
 export const updateProfile = async (req: Request, res: Response) => {
   try {
-    if (!req.user || !req.user._id) {
+    const userFromReq = (req as any).user;
+    
+    if (!userFromReq || !userFromReq._id) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
     
-    const userId = req.user._id.toString();
+    const userId = userFromReq._id.toString();
     const { username, bio } = req.body;
     
     // Get fresh user data from database to avoid type issues
@@ -163,11 +179,13 @@ export const updateProfile = async (req: Request, res: Response) => {
 // Update profile picture
 export const updateProfilePicture = async (req: Request, res: Response) => {
   try {
-    if (!req.user || !req.user._id) {
+    const userFromReq = (req as any).user;
+    
+    if (!userFromReq || !userFromReq._id) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
     
-    const userId = req.user._id.toString();
+    const userId = userFromReq._id.toString();
     
     // Get fresh user data from database
     const user = await User.findById(userId);

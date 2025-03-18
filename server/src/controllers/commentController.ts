@@ -1,57 +1,62 @@
 import { Request, Response } from 'express';
 import Comment from '../models/Comment';
 import Post from '../models/Post';
+import User from '../models/User';
 
 // Create a new comment
-export const createComment = async (req: Request, res: Response) => {
+export const createComment = async (req: Request, res: Response): Promise<void> => {
   try {
+    // שימוש ב-type assertion לגישה לאובייקט המשתמש
+    const user = (req as any).user;
+    
+    if (!user) {
+      res.status(401).json({ message: 'User not authenticated' });
+      return;
+    }
+    
     const { postId } = req.params;
     const { content } = req.body;
-    const user = req.user;
-
-    if (!user) {
-      return res.status(401).json({ message: 'User not authenticated' });
-    }
-
-    // Validate content
+    
+    // Validate required fields
     if (!content) {
-      return res.status(400).json({ message: 'Comment content is required' });
+      res.status(400).json({ message: 'Comment content is required' });
+      return;
     }
-
-    // Find the post
+    
+    // Check if post exists
     const post = await Post.findById(postId);
     if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
+      res.status(404).json({ message: 'Post not found' });
+      return;
     }
-
-    // Create the comment
+    
+    // Create new comment
     const comment = new Comment({
       content,
+      post: postId,
       user: user._id,
-      post: post._id
     });
-
+    
     await comment.save();
-
-    // Increment comments count on the post
+    
+    // Update comments count on the post
     post.commentsCount = (post.commentsCount || 0) + 1;
     await post.save();
-
-    // Return the created comment with user info
-    const commentResponse = {
-      id: comment._id,
-      content: comment.content,
-      post: comment.post,
-      user: {
-        id: user._id,
-        username: user.username,
-        profilePicture: user.profilePicture
+    
+    // Return comment with user details
+    res.status(201).json({
+      comment: {
+        id: comment._id,
+        content: comment.content,
+        createdAt: comment.get('createdAt'),
+        user: {
+          id: user._id,
+          username: user.username,
+          profilePicture: user.profilePicture
+        }
       },
-      createdAt: new Date(),
       commentsCount: post.commentsCount
-    };
-
-    res.status(201).json(commentResponse);
+    });
   } catch (error) {
     console.error('Error creating comment:', error);
     res.status(500).json({ message: 'Server error while creating comment' });
@@ -59,51 +64,39 @@ export const createComment = async (req: Request, res: Response) => {
 };
 
 // Get comments for a post
-export const getCommentsByPost = async (req: Request, res: Response) => {
+export const getCommentsByPost = async (req: Request, res: Response): Promise<void> => {
   try {
     const { postId } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     
-    // Check if post exists
-    const post = await Post.findById(postId);
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
-    
     const skip = (page - 1) * limit;
     
-    // Find comments for the post
+    // Find the post first to check if it exists
+    const post = await Post.findById(postId);
+    if (!post) {
+      res.status(404).json({ message: 'Post not found' });
+      return;
+    }
+    
+    // Find comments for the post with pagination
     const comments = await Comment.find({ post: postId })
       .populate('user', 'username profilePicture')
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: 1 }) // Oldest first
       .skip(skip)
       .limit(limit);
     
-    // Get total count for pagination
+    // Count total comments for pagination
     const totalComments = await Comment.countDocuments({ post: postId });
     
-    // Format comments for response
-    const formattedComments = comments.map(comment => {
-      const user = comment.user as any;
-      return {
-        id: comment._id,
-        content: comment.content,
-        user: {
-          id: user._id,
-          username: user.username,
-          profilePicture: user.profilePicture
-        },
-        createdAt: comment['createdAt']
-      };
-    });
-    
     res.status(200).json({
-      comments: formattedComments,
-      totalComments,
-      currentPage: page,
-      totalPages: Math.ceil(totalComments / limit),
-      hasMore: skip + comments.length < totalComments
+      comments,
+      pagination: {
+        total: totalComments,
+        page,
+        limit,
+        pages: Math.ceil(totalComments / limit)
+      }
     });
   } catch (error) {
     console.error('Error fetching comments:', error);
@@ -112,28 +105,18 @@ export const getCommentsByPost = async (req: Request, res: Response) => {
 };
 
 // Get comment by ID
-export const getCommentById = async (req: Request, res: Response) => {
+export const getCommentById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { commentId } = req.params;
     
     const comment = await Comment.findById(commentId).populate('user', 'username profilePicture');
     
     if (!comment) {
-      return res.status(404).json({ message: 'Comment not found' });
+      res.status(404).json({ message: 'Comment not found' });
+      return;
     }
     
-    const user = comment.user as any;
-    
-    res.status(200).json({
-      id: comment._id,
-      content: comment.content,
-      user: {
-        id: user._id,
-        username: user.username,
-        profilePicture: user.profilePicture
-      },
-      createdAt: comment['createdAt']
-    });
+    res.status(200).json(comment);
   } catch (error) {
     console.error('Error fetching comment:', error);
     res.status(500).json({ message: 'Server error while fetching comment' });
@@ -141,52 +124,52 @@ export const getCommentById = async (req: Request, res: Response) => {
 };
 
 // Update comment
-export const updateComment = async (req: Request, res: Response) => {
+export const updateComment = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { commentId } = req.params;
-    const { content } = req.body;
-    const user = req.user;
+    // שימוש ב-type assertion לגישה לאובייקט המשתמש
+    const user = (req as any).user;
     
     if (!user) {
-      return res.status(401).json({ message: 'User not authenticated' });
+      res.status(401).json({ message: 'User not authenticated' });
+      return;
     }
     
-    // Validate content
+    const { commentId } = req.params;
+    const { content } = req.body;
+    
+    // Validate required fields
     if (!content) {
-      return res.status(400).json({ message: 'Comment content is required' });
+      res.status(400).json({ message: 'Comment content is required' });
+      return;
     }
     
-    // Find the comment
+    // Find comment by ID
     const comment = await Comment.findById(commentId);
     
     if (!comment) {
-      return res.status(404).json({ message: 'Comment not found' });
+      res.status(404).json({ message: 'Comment not found' });
+      return;
     }
     
-    // Check if user is the owner of the comment
+    // Check if user is the comment owner
     if (comment.user && user._id && comment.user.toString() !== user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to update this comment' });
+      res.status(403).json({ message: 'Not authorized to update this comment' });
+      return;
     }
     
     // Update the comment
     comment.content = content;
     await comment.save();
     
-    // Populate user information
-    await comment.populate('user', 'username profilePicture');
-    
-    const commentUser = comment.user as any;
+    // Get post to return the comments count
+    const post = await Post.findById(comment.post);
+    const commentsCount = post ? post.commentsCount : 0;
     
     res.status(200).json({
-      id: comment._id,
-      content: comment.content,
-      user: {
-        id: commentUser._id,
-        username: commentUser.username,
-        profilePicture: commentUser.profilePicture
-      },
-      createdAt: comment['createdAt'],
-      updatedAt: comment['updatedAt']
+      message: 'Comment updated successfully',
+      comment,
+      postId: comment.post,
+      commentsCount
     });
   } catch (error) {
     console.error('Error updating comment:', error);
@@ -195,40 +178,50 @@ export const updateComment = async (req: Request, res: Response) => {
 };
 
 // Delete comment
-export const deleteComment = async (req: Request, res: Response) => {
+export const deleteComment = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { commentId } = req.params;
-    const user = req.user;
+    // שימוש ב-type assertion לגישה לאובייקט המשתמש
+    const user = (req as any).user;
     
     if (!user) {
-      return res.status(401).json({ message: 'User not authenticated' });
+      res.status(401).json({ message: 'User not authenticated' });
+      return;
     }
     
-    // Find the comment
+    const { commentId } = req.params;
+    
+    // Find comment by ID
     const comment = await Comment.findById(commentId);
     
     if (!comment) {
-      return res.status(404).json({ message: 'Comment not found' });
+      res.status(404).json({ message: 'Comment not found' });
+      return;
     }
     
-    // Check if user is the owner of the comment
+    // Check if user is the comment owner
     if (comment.user && user._id && comment.user.toString() !== user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to delete this comment' });
+      res.status(403).json({ message: 'Not authorized to delete this comment' });
+      return;
     }
     
-    // Find the post to update comments count
-    const post = await Post.findById(comment.post);
+    // Get post ID before deletion for response
+    const postId = comment.post;
     
     // Delete the comment
-    await comment.deleteOne();
+    await Comment.findByIdAndDelete(commentId);
     
-    // Decrement comments count on the post if it exists
+    // Update comments count on the post
+    const post = await Post.findById(postId);
     if (post) {
       post.commentsCount = Math.max((post.commentsCount || 0) - 1, 0);
       await post.save();
     }
     
-    res.status(200).json({ message: 'Comment deleted successfully' });
+    res.status(200).json({
+      message: 'Comment deleted successfully',
+      postId,
+      commentsCount: post ? post.commentsCount : 0
+    });
   } catch (error) {
     console.error('Error deleting comment:', error);
     res.status(500).json({ message: 'Server error while deleting comment' });

@@ -6,7 +6,7 @@ import * as FaIcons from 'react-icons/fa';
 
 const EditPost: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
-  const { state } = useAuth();
+  const { authState } = useAuth();
   const navigate = useNavigate();
   
   const [content, setContent] = useState('');
@@ -38,7 +38,7 @@ const EditPost: React.FC = () => {
         }
         
         // לוודא שהמשתמש הוא בעל הפוסט
-        if (post.user && post.user.id !== state.user?.id) {
+        if (post.user && post.user.id !== authState.user?.id) {
           setError('אין לך הרשאה לערוך פוסט זה');
           setTimeout(() => navigate('/'), 2000);
           return;
@@ -61,7 +61,7 @@ const EditPost: React.FC = () => {
     };
     
     fetchPost();
-  }, [postId, state.user, navigate]);
+  }, [postId, authState.user, navigate]);
   
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
@@ -155,7 +155,7 @@ const EditPost: React.FC = () => {
   };
   
   // אם המשתמש לא מחובר, הפנה לדף ההתחברות
-  if (!state.isAuthenticated) {
+  if (!authState.isAuthenticated) {
     navigate('/login');
     return null;
   }

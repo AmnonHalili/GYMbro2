@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
 import * as aiService from '../services/aiService';
 import { NutritionalValuesRequest } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const NutritionalCalculator: React.FC = () => {
+  const { authState: { isAuthenticated } } = useAuth();
   const [foodInput, setFoodInput] = useState('');
   const [foodItems, setFoodItems] = useState<string[]>([]);
-  const [nutritionalValues, setNutritionalValues] = useState<string>('');
+  const [nutritionalValues, setNutritionalValues] = useState<{
+    calories: number;
+    protein: string;
+    carbs: string;
+    fat: string;
+    [key: string]: any;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -31,19 +40,19 @@ const NutritionalCalculator: React.FC = () => {
     
     try {
       const request: NutritionalValuesRequest = { foodItems };
-      const response = await aiService.calculateNutritionalValues(request);
+      const response = await aiService.calculateNutrition(request.foodItems.join(", "));
       setNutritionalValues(response.nutritionalValues);
       
       // בעת קבלת תוצאות חדשות, נגלול אוטומטית לחלק התוצאות
       setTimeout(() => {
-        const resultSection = document.querySelector('.ai-result');
-        if (resultSection) {
-          resultSection.scrollIntoView({ behavior: 'smooth' });
+        const resultsElement = document.getElementById('nutrition-results');
+        if (resultsElement) {
+          resultsElement.scrollIntoView({ behavior: 'smooth' });
         }
-      }, 100);
-    } catch (error) {
+      }, 200);
+    } catch (error: any) {
       console.error('Error calculating nutritional values:', error);
-      setError('אירעה שגיאה בחישוב הערכים התזונתיים. אנא נסה שוב מאוחר יותר.');
+      setError(error.message || 'אירעה שגיאה בעת חישוב הערכים התזונתיים');
     } finally {
       setLoading(false);
     }
@@ -62,10 +71,23 @@ const NutritionalCalculator: React.FC = () => {
     if (foodItems.length > 0) {
       if (window.confirm('האם אתה בטוח שברצונך לנקות את כל רשימת המזונות?')) {
         setFoodItems([]);
-        setNutritionalValues('');
+        setNutritionalValues(null);
       }
     }
   };
+
+  // נוסיף בדיקה אם המשתמש מחובר
+  if (!isAuthenticated) {
+    return (
+      <div className="nutritional-calculator-container">
+        <h2 className="ai-title">מחשבון ערכים תזונתיים</h2>
+        <div className="alert alert-info">
+          <p>עליך להתחבר כדי לגשת למחשבון הערכים התזונתיים.</p>
+          <Link to="/login" className="btn btn-primary">התחבר</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="nutritional-calculator-container">
@@ -159,7 +181,7 @@ const NutritionalCalculator: React.FC = () => {
         <div className="ai-result">
           <h3>ערכים תזונתיים</h3>
           <div className="nutritional-values">
-            <pre>{nutritionalValues}</pre>
+            <pre>{JSON.stringify(nutritionalValues)}</pre>
           </div>
           <div className="result-disclaimer">
             <p className="text-muted small">

@@ -46,23 +46,25 @@ export const generateNutritionAdvice = async (
   targetWeight: number
 ): Promise<string> => {
   try {
-    const prompt = `Create a personalized nutrition plan with the following details:
-      - Goal: ${goal}
-      - Dietary restrictions: ${dietaryRestrictions}
-      - Current weight: ${currentWeight} kg
-      - Target weight: ${targetWeight} kg
+    const prompt = `הכן תוכנית תזונה מותאמת אישית בעברית עבור אדם עם הפרטים הבאים:
+      - מטרה: ${goal}
+      - הגבלות תזונתיות: ${dietaryRestrictions || 'אין'}
+      - משקל נוכחי: ${currentWeight} ק"ג
+      - משקל יעד: ${targetWeight} ק"ג
       
-      Please provide detailed nutritional advice including:
-      - Daily calorie target
-      - Macronutrient breakdown
-      - Meal timing recommendations
-      - Sample meal plan for a day
-      - Foods to focus on and avoid`;
+      אנא כלול את הפרטים הבאים:
+      - יעד קלורי יומי
+      - חלוקת מאקרו-נוטריאנטים (חלבונים, פחמימות, שומנים)
+      - המלצות לתזמון ארוחות
+      - תפריט לדוגמא ליום
+      - מזונות שמומלץ להתמקד בהם וכאלה שכדאי להימנע מהם
+      
+      חשוב: כתוב את כל התשובה בעברית מלאה. פרמט את התשובה בסגנון Markdown לקריאות טובה יותר.`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [
-        { role: 'system', content: 'You are a professional nutritionist with expertise in creating personalized nutrition plans.' },
+        { role: 'system', content: 'אתה תזונאי מקצועי עם מומחיות ביצירת תוכניות תזונה מותאמות אישית.' },
         { role: 'user', content: prompt }
       ],
       max_tokens: 1000,

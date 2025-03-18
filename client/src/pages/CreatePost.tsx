@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import * as postService from '../services/postService';
-import * as FaIcons from 'react-icons/fa';
 
 const CreatePost: React.FC = () => {
-  const { state } = useAuth();
+  const { authState } = useAuth();
   const navigate = useNavigate();
   
   const [content, setContent] = useState('');
@@ -14,6 +13,34 @@ const CreatePost: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [characterCount, setCharacterCount] = useState(0);
+  
+  // בדיקת אימות בעת טעינת הקומפוננטה
+  useEffect(() => {
+    console.log('[CreatePost] Authentication state on mount:', { 
+      isAuthenticated: authState.isAuthenticated,
+      user: authState.user ? { id: authState.user.id, username: authState.user.username } : null
+    });
+    
+    // בדיקה שיש טוקן בלוקל סטורג'
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      console.error('[CreatePost] No access token found in localStorage');
+      setError('לא נמצא טוקן התחברות. אנא התחבר מחדש.');
+      
+      // הוספת הפניה ישירה ללוגין אם אין טוקן
+      setTimeout(() => {
+        navigate('/login', { replace: true });
+      }, 100);
+    }
+    
+    if (!authState.isAuthenticated) {
+      console.warn('[CreatePost] User not authenticated, will redirect to login');
+      // הוספת הפניה ישירה ללוגין אם משתמש לא מאומת
+      setTimeout(() => {
+        navigate('/login', { replace: true });
+      }, 100);
+    }
+  }, [authState, navigate]);
   
   // הגבלת אורך התוכן
   const MAX_CONTENT_LENGTH = 500;
@@ -64,6 +91,14 @@ const CreatePost: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // בדיקה שהמשתמש מחובר לפני שליחת הפוסט
+    if (!authState.isAuthenticated || !authState.user) {
+      setError('אתה לא מחובר. אנא התחבר לפני יצירת פוסט חדש.');
+      navigate('/login', { replace: true });
+      return;
+    }
+    
+    // בדיקת תקינות תוכן הפוסט
     if (!content.trim()) {
       setError('יש להזין תוכן לפוסט');
       return;
@@ -77,7 +112,18 @@ const CreatePost: React.FC = () => {
     setIsSubmitting(true);
     setError(null);
     
+    // בדיקה מחדש שיש טוקן בלוקל סטורג'
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      console.error('[CreatePost] No access token found before submission');
+      setError('לא נמצא טוקן התחברות. אנא התחבר מחדש.');
+      setIsSubmitting(false);
+      navigate('/login', { replace: true });
+      return;
+    }
+    
     try {
+      console.log('[CreatePost] Starting post creation...');
       const formData = new FormData();
       formData.append('content', content);
       
@@ -85,40 +131,35 @@ const CreatePost: React.FC = () => {
         formData.append('image', image);
       }
       
+      // הוספת שדה userId מפורש
+      if (authState.user && authState.user.id) {
+        formData.append('userId', authState.user.id);
+      }
+      
+      console.log('[CreatePost] Form data prepared, sending to server');
+      
       // שליחת הפוסט החדש לשרת
       const response = await postService.createPost(formData);
       
       // הדפסת מבנה התשובה לצורכי דיבוג
-      console.log('Post creation response:', response);
+      console.log('[CreatePost] Post creation response:', response);
       
       // מנסים לזהות את ה-ID בהתאם למבנה התשובה
       let postId: string | undefined;
       
-      // בדיקת מבנה התשובה. לפי הלוגים, המבנה הוא {message: string, post: Post}
+      // בדיקת מבנה התשובה המעודכן
       if (response.post && typeof response.post === 'object') {
         // הפוסט נמצא בשדה post
-        if ('id' in response.post) {
-          postId = response.post.id;
-        } else if ('_id' in response.post) {
-          postId = response.post._id;
-        }
+        postId = response.post.id || response.post._id;
+        console.log('[CreatePost] Found post ID in response.post:', postId);
       } else if (response.data && typeof response.data === 'object') {
         // מבנה ApiResponse<Post> סטנדרטי
-        if ('id' in response.data) {
-          postId = response.data.id;
-        } else if ('_id' in response.data) {
-          postId = response.data._id;
-        }
-      } 
-      
-      // אם לא מצאנו ID, ננסה לבדוק עוד אפשרויות
-      if (!postId && typeof response === 'object') {
+        postId = response.data.id || response.data._id;
+        console.log('[CreatePost] Found post ID in response.data:', postId);
+      } else if (typeof response === 'object') {
         // ייתכן שהמבנה שונה מהצפוי
-        if ('id' in response) {
-          postId = (response as any).id;
-        } else if ('_id' in response) {
-          postId = (response as any)._id;
-        }
+        postId = (response as any).id || (response as any)._id;
+        console.log('[CreatePost] Found post ID directly in response:', postId);
       }
       
       // ניקוי הטופס אחרי יצירת פוסט בכל מקרה
@@ -128,43 +169,38 @@ const CreatePost: React.FC = () => {
       setImagePreview(null);
       
       if (postId) {
-        // גישה חדשה - נווט קודם לדף הבית ורק אחר כך לדף הפוסט
-        console.log('Post created with ID:', postId);
-        
-        // שמור את ה-ID בלוקל סטורג' כדי שנוכל לגשת אליו אחרי רענון הדף
-        localStorage.setItem('lastCreatedPostId', postId);
-        
-        // נווט לדף הבית תחילה, כדי לוודא שהפוסט נטען למערכת
-        console.log('Navigating to home page first...');
-        navigate('/', { replace: true });
-        
-        // ואז אחרי 1.5 שניות, נווט לדף הפוסט
-        setTimeout(() => {
-          console.log('Now navigating to post page...');
-          navigate(`/post/${postId}`);
-        }, 1500);
+        // נווט ישירות לדף הפוסט
+        console.log('[CreatePost] Post created successfully with ID:', postId);
+        navigate(`/post/${postId}`, { replace: true });
       } else {
-        // אם אין ID, פשוט חזור לעמוד הראשי
-        console.log('Post created successfully, but no ID found in response. Returning to home page.');
-        // רענון העמוד הראשי
+        console.log('[CreatePost] Post created but no ID found. Returning to home page.');
         navigate('/', { replace: true });
       }
+      
     } catch (error: any) {
-      console.error('Error creating post:', error);
-      console.error('Error details:', {
+      console.error('[CreatePost] Error creating post:', error);
+      console.error('[CreatePost] Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status
       });
-      setError(error.response?.data?.message || 'אירעה שגיאה ביצירת הפוסט. אנא נסה שוב.');
+      
+      // טיפול מיוחד בשגיאות אימות
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setError('פג תוקף ההתחברות. אנא התחבר מחדש.');
+        navigate('/login', { replace: true });
+      } else {
+        setError(error.message || error.response?.data?.message || 'אירעה שגיאה ביצירת הפוסט. אנא נסה שוב.');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
   
   // אם המשתמש לא מחובר, הפנה לדף ההתחברות
-  if (!state.isAuthenticated) {
-    navigate('/login');
+  if (!authState.isAuthenticated) {
+    console.log('[CreatePost] User not authenticated, redirecting to login');
+    navigate('/login', { replace: true });
     return null;
   }
   
@@ -215,7 +251,7 @@ const CreatePost: React.FC = () => {
                     className="btn btn-sm btn-danger position-absolute top-0 end-0"
                     onClick={removeImage}
                   >
-                    <span>{FaIcons.FaTrash({})}</span>
+                    🗑️
                   </button>
                 </div>
               ) : (
@@ -228,7 +264,7 @@ const CreatePost: React.FC = () => {
                     onChange={handleImageChange}
                   />
                   <label className="input-group-text" htmlFor="image">
-                    <span className="me-1">{FaIcons.FaImage({})}</span> בחר תמונה
+                    <span className="me-1">📷</span> בחר תמונה
                   </label>
                 </div>
               )}
@@ -241,22 +277,16 @@ const CreatePost: React.FC = () => {
               <button 
                 type="submit" 
                 className="btn btn-primary" 
-                disabled={isSubmitting}
+                disabled={isSubmitting || !authState.isAuthenticated}
               >
                 {isSubmitting ? (
                   <>
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                     שולח פוסט...
                   </>
-                ) : 'פרסם פוסט'}
-              </button>
-              
-              <button 
-                type="button" 
-                className="btn btn-outline-secondary" 
-                onClick={() => navigate('/')}
-              >
-                ביטול
+                ) : (
+                  'פרסם פוסט'
+                )}
               </button>
             </div>
           </form>

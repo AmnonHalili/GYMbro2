@@ -4,6 +4,15 @@ import * as postService from '../services/postService';
 import { Post, Pagination as PaginationType } from '../types';
 import { useAuth } from '../context/AuthContext';
 import PostCard from '../components/PostCard';
+import { 
+  FaAngleRight, 
+  FaAngleLeft, 
+  FaSync, 
+  FaPlus, 
+  FaFilter 
+} from 'react-icons/fa';
+// @ts-ignore
+import { toast } from 'react-toastify';
 
 // Pagination component
 const Pagination: React.FC<{
@@ -13,27 +22,54 @@ const Pagination: React.FC<{
   const { page, pages } = pagination;
 
   return (
-    <div className="pagination">
+    <div className="pagination-container">
       <button 
-        className="btn btn-secondary"
+        className="pagination-btn"
         disabled={page === 1}
         onClick={() => onPageChange(page - 1)}
+        aria-label="לעמוד הקודם"
       >
-        הקודם
+        {FaAngleRight({ className: "icon" })}
       </button>
       
       <span className="pagination-info">עמוד {page} מתוך {pages}</span>
       
       <button 
-        className="btn btn-secondary"
+        className="pagination-btn"
         disabled={page === pages}
         onClick={() => onPageChange(page + 1)}
+        aria-label="לעמוד הבא"
       >
-        הבא
+        {FaAngleLeft({ className: "icon" })}
       </button>
     </div>
   );
 };
+
+// Skeleton loading component
+const PostCardSkeleton: React.FC = () => (
+  <div className="card post-card skeleton-card">
+    <div className="skeleton-image"></div>
+    <div className="card-body">
+      <div className="skeleton-header">
+        <div className="skeleton-avatar"></div>
+        <div className="skeleton-text-container">
+          <div className="skeleton-text skeleton-title"></div>
+          <div className="skeleton-text skeleton-subtitle"></div>
+        </div>
+      </div>
+      <div className="skeleton-text"></div>
+      <div className="skeleton-text"></div>
+      <div className="skeleton-text skeleton-text-short"></div>
+    </div>
+    <div className="card-footer">
+      <div className="skeleton-footer">
+        <div className="skeleton-action"></div>
+        <div className="skeleton-action"></div>
+      </div>
+    </div>
+  </div>
+);
 
 // פונקציה לסימון דף הפיד שצריך לרענן את הנתונים אחרי חזרה
 export const markFeedForRefresh = () => {
@@ -52,12 +88,17 @@ const Home: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showUserPostsOnly, setShowUserPostsOnly] = useState(false);
-  const { state } = useAuth();
-  const { user } = state;
+  const [refreshing, setRefreshing] = useState(false);
+  const { authState } = useAuth();
+  const { user } = authState;
 
   // Fetch posts
-  const fetchPosts = async (page: number = 1) => {
-    setLoading(true);
+  const fetchPosts = async (page: number = 1, showRefreshAnimation: boolean = false) => {
+    if (showRefreshAnimation) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     
     try {
@@ -91,15 +132,16 @@ const Home: React.FC = () => {
     } catch (error) {
       console.error('Error fetching posts:', error);
       setError('אירעה שגיאה בטעינת הפוסטים. אנא נסה שוב מאוחר יותר.');
+      toast.error('לא ניתן לטעון את הפוסטים כרגע. נסה שוב מאוחר יותר.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // אם העמוד נטען, נטען את הפוסטים
+  // Load posts when component mounts or filter changes
   useEffect(() => {
-    // אם אנחנו מנווטים בחזרה לדף הבית אחרי הוספת תגובה,
-    // נוודא שהנתונים מתרעננים
+    // Check if we should refresh data after navigation
     const shouldRefreshData = sessionStorage.getItem('shouldRefreshPosts') === 'true';
     
     if (shouldRefreshData) {
@@ -113,6 +155,8 @@ const Home: React.FC = () => {
   // Handle page change
   const handlePageChange = (page: number) => {
     fetchPosts(page);
+    // Scroll to top after page change
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Toggle filter
@@ -120,22 +164,56 @@ const Home: React.FC = () => {
     setShowUserPostsOnly(!showUserPostsOnly);
   };
 
+  // Handle refresh
+  const handleRefresh = () => {
+    fetchPosts(pagination.page, true);
+    toast.info('מרענן פוסטים...');
+  };
+
+  // Handle post deletion
+  const handlePostDeleted = () => {
+    fetchPosts(pagination.page);
+    toast.success('הפוסט נמחק בהצלחה');
+  };
+
+  // Generate skeleton cards for loading state
+  const renderSkeletons = () => {
+    return Array(6).fill(0).map((_, index) => (
+      <div key={`skeleton-${index}`} className="col-md-6 col-lg-4 mb-4">
+        <PostCardSkeleton />
+      </div>
+    ));
+  };
+
   return (
-    <div className="container mt-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2>פיד הפוסטים</h2>
+    <div className="feed-container container mt-4">
+      <div className="feed-header">
+        <div className="feed-title">
+          <h2>פיד הפוסטים</h2>
+          
+          <button 
+            className={`refresh-btn ${refreshing ? 'refreshing' : ''}`}
+            onClick={handleRefresh}
+            disabled={loading || refreshing}
+            aria-label="רענן פוסטים"
+          >
+            {FaSync({ className: "icon" })}
+          </button>
+        </div>
         
-        <div className="d-flex gap-2">
-          <Link to="/create-post" className="btn btn-primary">
-            <i className="fas fa-plus me-1"></i> פוסט חדש
+        <div className="feed-actions">
+          <Link to="/create-post" className="btn-create-post">
+            {FaPlus({ className: "icon" })} פוסט חדש
           </Link>
           
-          {state.isAuthenticated && (
+          {authState.isAuthenticated && (
             <button 
-              className={`btn ${showUserPostsOnly ? 'btn-success' : 'btn-outline-secondary'}`}
+              className={`btn-filter ${showUserPostsOnly ? 'active' : ''}`}
               onClick={toggleFilter}
+              aria-label={showUserPostsOnly ? 'הצג את כל הפוסטים' : 'הצג רק את הפוסטים שלי'}
             >
-              {showUserPostsOnly ? 'הפוסטים שלי' : 'כל הפוסטים'}
+              {FaFilter({ className: "icon" })}
+              <span>{showUserPostsOnly ? 'הפוסטים שלי' : 'כל הפוסטים'}</span>
             </button>
           )}
         </div>
@@ -143,40 +221,41 @@ const Home: React.FC = () => {
       
       {error && <div className="alert alert-danger">{error}</div>}
       
-      {loading ? (
-        <div className="d-flex justify-content-center my-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">טוען...</span>
+      <div className="row">
+        {loading ? (
+          renderSkeletons()
+        ) : posts.length === 0 ? (
+          <div className="empty-posts-container">
+            <div className="empty-posts-message">
+              <h3>אין פוסטים להצגה כרגע</h3>
+              <p>{showUserPostsOnly ? 'עדיין לא פרסמת פוסטים.' : 'אין פוסטים זמינים כרגע.'}</p>
+              
+              {authState.isAuthenticated && (
+                <Link to="/create-post" className="btn-create-first">
+                  {FaPlus({ className: "icon" })} 
+                  {showUserPostsOnly ? 'צור את הפוסט הראשון שלך' : 'פרסם פוסט חדש'}
+                </Link>
+              )}
+            </div>
           </div>
-        </div>
-      ) : posts.length === 0 ? (
-        <div className="alert alert-info text-center p-5">
-          <p className="mb-3">אין פוסטים להצגה כרגע.</p>
-          {showUserPostsOnly && state.isAuthenticated && (
-            <Link to="/create-post" className="btn btn-primary">
-              צור את הפוסט הראשון שלך
-            </Link>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="row">
+        ) : (
+          <>
             {posts.map(post => (
               <div key={post.id || post._id} className="col-md-6 col-lg-4 mb-4">
-                <PostCard post={post} />
+                <PostCard post={post} onPostDeleted={handlePostDeleted} />
               </div>
             ))}
-          </div>
-          
-          {pagination.pages > 1 && (
-            <div className="d-flex justify-content-center mt-4">
-              <Pagination 
-                pagination={pagination} 
-                onPageChange={handlePageChange} 
-              />
-            </div>
-          )}
-        </>
+          </>
+        )}
+      </div>
+      
+      {!loading && posts.length > 0 && pagination.pages > 1 && (
+        <div className="pagination-wrapper">
+          <Pagination 
+            pagination={pagination} 
+            onPageChange={handlePageChange} 
+          />
+        </div>
       )}
     </div>
   );

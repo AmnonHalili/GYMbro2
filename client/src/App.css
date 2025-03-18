@@ -133,25 +133,36 @@
 /* Post card styles */
 .post-card {
   background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   margin-bottom: 20px;
   overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.post-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
 .post-header {
   display: flex;
   align-items: center;
   padding: 15px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .post-avatar {
-  width: 40px;
-  height: 40px;
+  width: 45px;
+  height: 45px;
   border-radius: 50%;
-  margin-right: 10px;
+  margin-left: 12px; /* RTL support */
+  margin-right: 0; /* RTL support */
   object-fit: cover;
+  border: 2px solid #f0f0f0;
 }
 
 .post-user-info {
@@ -159,8 +170,15 @@
 }
 
 .post-username {
-  font-weight: bold;
+  font-weight: 600;
   margin-bottom: 5px;
+  color: #333;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.post-username:hover {
+  color: var(--primary, #4a90e2);
 }
 
 .post-date {
@@ -170,44 +188,60 @@
 
 .post-content {
   padding: 15px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .post-text {
   margin-bottom: 15px;
+  overflow-wrap: break-word;
+  white-space: pre-line;
 }
 
 .post-image {
   width: 100%;
-  max-height: 500px;
-  object-fit: contain;
-  border-radius: 4px;
+  max-height: 300px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-top: auto;
 }
 
-.post-actions {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 15px;
-  border-top: 1px solid #eee;
+.card-footer {
+  border-top: 1px solid #f0f0f0;
+  padding: 12px 15px;
+  background-color: #fff;
 }
 
-.post-action-btn {
+.post-interactions {
   display: flex;
-  align-items: center;
-  gap: 5px;
+  justify-content: flex-start;
+  gap: 20px;
+}
+
+.btn-interaction {
   background: none;
   border: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #666;
+  font-weight: 500;
+  padding: 5px 0;
   cursor: pointer;
-  color: #555;
-  padding: 5px 10px;
-  border-radius: 4px;
+  transition: all 0.2s ease;
 }
 
-.post-action-btn:hover {
-  background-color: #f1f1f1;
+.btn-interaction:hover {
+  color: var(--primary, #4a90e2);
 }
 
-.post-action-btn.liked {
-  color: #e53935;
+.btn-interaction.like.active {
+  color: #e74c3c;
+}
+
+.btn-interaction .icon {
+  font-size: 1.2rem;
 }
 
 /* Profile styles */

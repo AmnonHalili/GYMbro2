@@ -1,10 +1,19 @@
-import React from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { ReactNode } from 'react';
+import Navbar from './Navbar';
+import FloatingButton from './FloatingButton';
 
-const Layout: React.FC = () => {
+interface LayoutProps {
+  children: ReactNode;
+}
+
+const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="layout">
-      <Outlet />
+    <div className="app">
+      <Navbar />
+      <main className="content">
+        {children}
+      </main>
+      <FloatingButton />
     </div>
   );
 };

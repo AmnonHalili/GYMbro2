@@ -1,0 +1,610 @@
+/* GYMbro Authentication Styles - Modern & Professional */
+:root {
+  /* Main Colors */
+  --gym-primary: #2ecc71;
+  --gym-primary-dark: #27ae60;
+  --gym-primary-light: #a5e8bc;
+  --gym-accent: #3498db;
+  --gym-dark: #2c3e50;
+  --gym-light: #ecf0f1;
+  --gym-danger: #e74c3c;
+  --gym-warning: #f39c12;
+  --gym-success: #27ae60;
+  --gym-text: #2c3e50;
+  --gym-text-light: #7f8c8d;
+  --gym-border: #dfe6e9;
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.12);
+  --shadow-hover: 0 15px 35px rgba(46, 204, 113, 0.15);
+  
+  /* Animation */
+  --transition-speed: 0.3s;
+}
+
+/* AuthPage Container */
+.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--gym-light);
+  direction: rtl;
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+}
+
+/* Background Elements */
+.auth-page::before {
+  content: '';
+  position: absolute;
+  top: -10%;
+  right: -10%;
+  width: 50%;
+  height: 70%;
+  background: radial-gradient(circle, var(--gym-primary-light) 0%, rgba(255,255,255,0) 70%);
+  opacity: 0.7;
+  z-index: 0;
+}
+
+.auth-page::after {
+  content: '';
+  position: absolute;
+  bottom: -10%;
+  left: -10%;
+  width: 50%;
+  height: 70%;
+  background: radial-gradient(circle, var(--gym-accent) 0%, rgba(255,255,255,0) 70%);
+  opacity: 0.2;
+  z-index: 0;
+}
+
+/* Fitness themed background icons */
+.fitness-icon {
+  position: absolute;
+  opacity: 0.06;
+  z-index: 0;
+}
+
+.fitness-icon.dumbbell {
+  top: 10%;
+  right: 10%;
+  font-size: 10rem;
+  transform: rotate(25deg);
+}
+
+.fitness-icon.running {
+  bottom: 15%;
+  right: 20%;
+  font-size: 8rem;
+}
+
+.fitness-icon.bicycle {
+  top: 20%;
+  left: 10%;
+  font-size: 9rem;
+}
+
+.fitness-icon.heartbeat {
+  bottom: 10%;
+  left: 15%;
+  font-size: 7rem;
+  transform: rotate(-15deg);
+}
+
+/* Auth Card */
+.auth-card {
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 450px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+}
+
+.auth-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-hover);
+}
+
+/* Auth Card Header */
+.auth-header {
+  padding: 30px 30px 20px;
+  text-align: center;
+  border-bottom: 1px solid var(--gym-border);
+  position: relative;
+}
+
+.auth-logo {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--gym-primary);
+  color: white;
+  font-size: 2.5rem;
+  border-radius: 50%;
+  box-shadow: var(--shadow-md);
+}
+
+.auth-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--gym-dark);
+  margin: 0 0 10px;
+}
+
+.auth-subtitle {
+  font-size: 1rem;
+  color: var(--gym-text-light);
+  margin: 0;
+}
+
+/* Auth Card Body */
+.auth-body {
+  padding: 30px;
+}
+
+/* Auth Form */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Form Group */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--gym-text);
+}
+
+.form-label svg {
+  color: var(--gym-primary);
+}
+
+/* Input Container */
+.input-container {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gym-text-light);
+  transition: color var(--transition-speed);
+}
+
+.form-control {
+  width: 100%;
+  padding: 14px 45px 14px 15px;
+  border: 2px solid var(--gym-border);
+  border-radius: 10px;
+  font-size: 1rem;
+  color: var(--gym-text);
+  transition: border-color var(--transition-speed), box-shadow var(--transition-speed);
+  background-color: white;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--gym-primary);
+  box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.2);
+}
+
+.form-control:focus + .input-icon {
+  color: var(--gym-primary);
+}
+
+/* Input States */
+.form-control.is-invalid {
+  border-color: var(--gym-danger);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23e74c3c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cline x1='12' y1='8' x2='12' y2='12'%3E%3C/line%3E%3Cline x1='12' y1='16' x2='12.01' y2='16'%3E%3C/line%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 15px center;
+  background-size: 20px;
+  padding-left: 45px;
+}
+
+.form-control.is-valid {
+  border-color: var(--gym-success);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2327ae60' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 11.08V12a10 10 0 1 1-5.93-9.14'%3E%3C/path%3E%3Cpolyline points='22 4 12 14.01 9 11.01'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 15px center;
+  background-size: 20px;
+  padding-left: 45px;
+}
+
+.invalid-feedback {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.85rem;
+  color: var(--gym-danger);
+}
+
+/* Password Strength Meter */
+.password-strength {
+  margin-top: 10px;
+  margin-bottom: 5px;
+}
+
+.strength-meter {
+  display: flex;
+  gap: 5px;
+  height: 6px;
+  margin-bottom: 8px;
+}
+
+.strength-segment {
+  flex: 1;
+  height: 100%;
+  background-color: #e0e0e0;
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+}
+
+.strength-text {
+  font-size: 0.85rem;
+  text-align: right;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+/* Error Messages */
+.error-message {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.85rem;
+  color: var(--gym-danger);
+}
+
+.terms-error {
+  margin-top: 5px;
+}
+
+/* Checkbox Custom Styling */
+.checkbox-group {
+  margin-top: 5px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+.checkbox-label input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkbox-custom {
+  position: relative;
+  top: 2px;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-left: 10px;
+  background-color: white;
+  border: 2px solid var(--gym-border);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.checkbox-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.checkbox-label input:checked ~ .checkbox-custom {
+  background-color: var(--gym-primary);
+  border-color: var(--gym-primary);
+}
+
+.checkbox-label input:checked ~ .checkbox-custom .checkbox-icon {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.checkbox-label:hover .checkbox-custom {
+  border-color: var(--gym-primary);
+}
+
+.checkbox-error {
+  color: var(--gym-danger);
+}
+
+.checkbox-error .checkbox-custom {
+  border-color: var(--gym-danger);
+}
+
+.terms-link {
+  color: var(--gym-primary);
+  text-decoration: underline;
+  margin: 0 3px;
+}
+
+.terms-link:hover {
+  color: var(--gym-primary-dark);
+}
+
+/* Input Error State */
+.input-error {
+  border-color: var(--gym-danger) !important;
+}
+
+.input-error:focus {
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.2) !important;
+}
+
+.input-error + .input-icon {
+  color: var(--gym-danger);
+}
+
+/* Register Card Specific */
+.register-card {
+  max-width: 500px;
+}
+
+/* Primary Button */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background-color: var(--gym-primary);
+  color: white;
+  padding: 14px 25px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-speed), transform var(--transition-speed);
+  margin-top: 10px;
+  box-shadow: var(--shadow-md);
+  width: 100%;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--gym-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-primary svg {
+  font-size: 1.2rem;
+}
+
+/* Button loading state */
+.btn-loading {
+  position: relative;
+  color: transparent !important;
+}
+
+.btn-loading::after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spinner 0.8s linear infinite;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Divider */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 25px 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--gym-border);
+}
+
+.auth-divider-text {
+  padding: 0 15px;
+  font-size: 0.9rem;
+  color: var(--gym-text-light);
+}
+
+/* Google Button */
+.google-button-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+/* Auth Footer */
+.auth-footer {
+  text-align: center;
+  padding: 20px 30px;
+  border-top: 1px solid var(--gym-border);
+}
+
+.auth-footer-text {
+  color: var(--gym-text-light);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.auth-footer-link {
+  color: var(--gym-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--transition-speed);
+}
+
+.auth-footer-link:hover {
+  color: var(--gym-primary-dark);
+  text-decoration: underline;
+}
+
+/* Forgot Password Link */
+.forgot-password-link {
+  display: inline-block;
+  font-size: 0.9rem;
+  color: var(--gym-primary);
+  text-decoration: none;
+  margin-top: 5px;
+  transition: color var(--transition-speed);
+}
+
+.forgot-password-link:hover {
+  color: var(--gym-primary-dark);
+  text-decoration: underline;
+}
+
+/* Error Alert */
+.auth-alert {
+  background-color: rgba(231, 76, 60, 0.1);
+  color: var(--gym-danger);
+  border-radius: 8px;
+  padding: 12px 15px;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.auth-alert svg {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+/* Success Alert */
+.auth-alert.success {
+  background-color: rgba(46, 204, 113, 0.1);
+  color: var(--gym-success);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.fade-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.fade-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.fade-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 575.98px) {
+  .auth-card {
+    margin: 20px 0;
+  }
+  
+  .auth-header,
+  .auth-body,
+  .auth-footer {
+    padding: 20px;
+  }
+  
+  .auth-title {
+    font-size: 1.5rem;
+  }
+  
+  .auth-logo {
+    width: 70px;
+    height: 70px;
+    font-size: 2rem;
+  }
+  
+  .form-control {
+    padding: 12px 40px 12px 15px;
+  }
+  
+  .btn-primary {
+    padding: 12px 20px;
+  }
+}
+
+/* Focus Visible Utility for Accessibility */
+.focus-visible {
+  outline: 3px solid rgba(46, 204, 113, 0.5);
+  outline-offset: 2px;
+}
+
+/* Keyboard Navigation Indicator */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 3px solid rgba(46, 204, 113, 0.5);
+  outline-offset: 2px;
+} 

@@ -209,12 +209,43 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 // Google Login/Register
 export const googleAuth = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { token, email, name, picture, googleId } = req.body;
-
-    if (!token || !email || !googleId) {
-      res.status(400).json({ message: 'Missing required Google auth data' });
+    const { token } = req.body;
+    
+    console.log('Google Auth Request:', { 
+      hasToken: !!token, 
+      tokenLength: token ? token.length : 0,
+      bodyKeys: Object.keys(req.body)
+    });
+    
+    if (!token) {
+      res.status(400).json({ message: 'Missing required Google token' });
       return;
     }
+    
+    // פיענוח הטוקן מגוגל לקבלת פרטי המשתמש
+    let decodedToken;
+    try {
+      decodedToken = jwt.decode(token);
+      console.log('Decoded Google token:', {
+        hasEmail: !!decodedToken?.email,
+        hasSub: !!decodedToken?.sub,
+        hasName: !!decodedToken?.name
+      });
+      
+      if (!decodedToken || !decodedToken.email || !decodedToken.sub) {
+        res.status(400).json({ message: 'Invalid Google token or missing user data' });
+        return;
+      }
+    } catch (decodeError) {
+      console.error('Failed to decode Google token:', decodeError);
+      res.status(400).json({ message: 'Invalid Google token format' });
+      return;
+    }
+    
+    const email = decodedToken.email;
+    const googleId = decodedToken.sub;
+    const name = decodedToken.name || email.split('@')[0];
+    const picture = decodedToken.picture || '';
 
     // בדיקה אם המשתמש כבר קיים על פי ה-googleId
     let user = await User.findOne({ googleId });
@@ -282,7 +313,7 @@ export const googleAuth = async (req: Request, res: Response): Promise<void> => 
     });
   } catch (error) {
     console.error('Google auth error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error during Google authentication' });
   }
 };
 

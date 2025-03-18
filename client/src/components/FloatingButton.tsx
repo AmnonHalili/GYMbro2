@@ -5,10 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import './FloatingButton.css';
 
 const FloatingButton: React.FC = () => {
-  const { state } = useAuth();
+  const { authState } = useAuth();
   
   // הצג את הכפתור רק למשתמשים מחוברים
-  if (!state.isAuthenticated) {
+  if (!authState.isAuthenticated) {
     return null;
   }
   

@@ -1,7 +1,12 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import './App.css';
 import './styles/theme.css';
+import { setNavigate } from './services/api';
+import { AuthProvider } from './context/AuthContext';
+// @ts-ignore
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Import Pages
 import Home from './pages/Home';
@@ -24,10 +29,16 @@ import Navbar from './components/Navbar';
 import FloatingButton from './components/FloatingButton';
 
 const App: React.FC = () => {
+  const navigate = useNavigate();
+  
+  // הגדר את פונקציית הניתוב לשימוש במערכת ה-API
+  useEffect(() => {
+    setNavigate(navigate);
+  }, [navigate]);
+  
   return (
-    <div className="app">
-      <Navbar />
-      <main className="content">
+    <AuthProvider>
+      <Layout>
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
@@ -61,17 +72,43 @@ const App: React.FC = () => {
             </PrivateRoute>
           } />
           <Route path="/post/:postId" element={<PostDetail />} />
-          <Route path="/nutrition-advice" element={<NutritionAdvice />} />
-          <Route path="/nutritional-calculator" element={<NutritionalCalculator />} />
-          <Route path="/workout-planner" element={<WorkoutPlanner />} />
+          
+          {/* AI Routes - Protected */}
+          <Route path="/nutrition-advice" element={
+            <PrivateRoute>
+              <NutritionAdvice />
+            </PrivateRoute>
+          } />
+          <Route path="/nutritional-calculator" element={
+            <PrivateRoute>
+              <NutritionalCalculator />
+            </PrivateRoute>
+          } />
+          <Route path="/workout-planner" element={
+            <PrivateRoute>
+              <WorkoutPlanner />
+            </PrivateRoute>
+          } />
           
           {/* Fallback route */}
           <Route path="/404" element={<NotFound />} />
           <Route path="*" element={<Navigate to="/404" replace />} />
         </Routes>
-      </main>
-      <FloatingButton />
-    </div>
+      </Layout>
+
+      {/* Toast notifications container */}
+      <ToastContainer
+        position="bottom-left"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={true}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+    </AuthProvider>
   );
 };
 

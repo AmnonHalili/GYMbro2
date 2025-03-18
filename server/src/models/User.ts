@@ -9,6 +9,8 @@ export interface IUser extends Document {
   bio?: string;
   googleId?: string;
   refreshToken?: string;
+  isAdmin?: boolean;
+  role?: string;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -48,6 +50,15 @@ const UserSchema = new Schema(
     },
     googleId: {
       type: String
+    },
+    isAdmin: {
+      type: Boolean,
+      default: false
+    },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user'
     }
   },
   { timestamps: true }
