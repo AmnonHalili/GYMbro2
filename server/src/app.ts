@@ -23,6 +23,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Ensure upload directories
 const ensureUploadDirs = () => {
+  console.log('=== בדיקת תיקיות העלאה ===');
+  console.log('נתיב נוכחי:', process.cwd());
+  console.log('מיקום קובץ app.ts:', __dirname);
+  
   const uploadDirs = [
     path.join(__dirname, '../uploads'),
     path.join(__dirname, '../uploads/posts'),
@@ -30,19 +34,25 @@ const ensureUploadDirs = () => {
     path.join(__dirname, '../logs')
   ];
   
+  console.log('נתיבי תיקיות העלאה:');
   uploadDirs.forEach(dir => {
+    console.log(`בודק תיקייה: ${dir}`);
     if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-      console.log(`Created directory: ${dir}`);
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`נוצרה תיקייה חדשה: ${dir}`);
+      } catch (err) {
+        console.error(`שגיאה ביצירת תיקייה ${dir}:`, err);
+      }
     } else {
       // Check writability
       try {
         const testFile = path.join(dir, '.write-test');
         fs.writeFileSync(testFile, 'test');
         fs.unlinkSync(testFile);
-        console.log(`Directory ${dir} exists and is writable`);
+        console.log(`תיקייה ${dir} קיימת וניתנת לכתיבה`);
       } catch (err) {
-        console.error(`Directory ${dir} exists but is not writable!`, err);
+        console.error(`תיקייה ${dir} קיימת אך אינה ניתנת לכתיבה!`, err);
       }
     }
   });
@@ -52,14 +62,25 @@ const ensureUploadDirs = () => {
   if (fs.existsSync(postsDir)) {
     try {
       const files = fs.readdirSync(postsDir);
-      console.log(`Found ${files.length} files in ${postsDir}`);
+      console.log(`נמצאו ${files.length} קבצים בתיקייה ${postsDir}`);
       if (files.length > 0) {
-        console.log('Sample files:', files.slice(0, 5));
+        console.log('דוגמאות לקבצים:', files.slice(0, 5));
+      }
+      
+      // בדיקת תיקייה מהנתיב המוחלט בעזרת process.cwd
+      const absolutePostsDir = path.join(process.cwd(), 'uploads/posts');
+      if (fs.existsSync(absolutePostsDir)) {
+        const absFiles = fs.readdirSync(absolutePostsDir);
+        console.log(`נמצאו ${absFiles.length} קבצים בנתיב המוחלט ${absolutePostsDir}`);
+      } else {
+        console.log(`נתיב מוחלט לא נמצא: ${absolutePostsDir}`);
       }
     } catch (err) {
-      console.error('Error reading files in posts directory:', err);
+      console.error('שגיאה בקריאת קבצים מתיקיית התמונות:', err);
     }
   }
+  
+  console.log('=== סיום בדיקת תיקיות העלאה ===');
 };
 
 // Call at server startup

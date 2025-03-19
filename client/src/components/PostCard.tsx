@@ -32,7 +32,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostDeleted }) => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Check if current user is the post owner
-  const isPostOwner = authState.user?.id === post.user.id;
+  const isPostOwner = authState.user?.id === post.user.id || authState.user?.id === post.user._id;
   
   // Get valid post id
   const postId = post.id || post._id;
@@ -180,34 +180,152 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostDeleted }) => {
     }
   };
   
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, postId: string) => {
-    const img = e.currentTarget;
-    console.error(`[PostCard] Failed to load image for post ${postId}, url: ${img.src}`);
+  // בחירת מקור התמונה המתאים עבור הפוסט
+  const getPostImageSource = (): string => {
+    if (!post) return '';
     
-    // מסתיר את התמונה אם לא נטענה
-    img.style.display = 'none';
+    console.log(`[PostCard] Getting image source for post ${postId}. Image sources: `, {
+      image: post.image,
+      imgUrl: post.imgUrl,
+      imageUrl: (post as any).imageUrl
+    });
     
-    // הסתרת הקונטיינר של התמונה במקרה של כשל בטעינה
-    const container = img.parentElement;
-    if (container) {
-      container.style.display = 'none';
+    // איסוף כל נתיבי התמונה האפשריים
+    const imagePaths = [
+      post.image,
+      post.imgUrl,
+      (post as any).imageUrl
+    ].filter(Boolean); // סינון ערכים ריקים
+    
+    if (imagePaths.length === 0) {
+      console.log(`[PostCard] No image paths found for post ${postId}`);
+      return '';
+    }
+    
+    // בחירת הנתיב הטוב ביותר (עדיפות לנתיב שמתחיל ב-/uploads/)
+    let bestPath = imagePaths.find(path => path && path.includes('/uploads/')) || imagePaths[0];
+    
+    // וידוא שהנתיב מתחיל נכון (/ או http)
+    if (bestPath && !bestPath.startsWith('/') && !bestPath.startsWith('http')) {
+      bestPath = '/' + bestPath;
+      console.log(`[PostCard] Fixed image path format, added leading slash: ${bestPath}`);
+    }
+    
+    // בדיקות תקינות נוספות לנתיב תמונה
+    if (bestPath) {
+      // תיקון נתיבים לא תקינים
+      if (bestPath.includes('undefined') || bestPath.includes('null')) {
+        console.error(`[PostCard] Invalid image path contains undefined/null: ${bestPath}`);
+        return '';
+      }
+      
+      // תיקון נתיבים כפולים (לדוגמה: /uploads/uploads/...)
+      if (bestPath.includes('/uploads/uploads/')) {
+        bestPath = bestPath.replace('/uploads/uploads/', '/uploads/');
+        console.log(`[PostCard] Fixed duplicate uploads path: ${bestPath}`);
+      }
+    }
+    
+    // שימוש בפונקציה getImageUrl כדי לבנות URL שלם
+    try {
+      const fullUrl = getImageUrl(bestPath);
+      console.log(`[PostCard] Final image URL: ${fullUrl}`);
+      return fullUrl;
+    } catch (error) {
+      console.error(`[PostCard] Error building image URL: ${error}`);
+      
+      // במקרה של שגיאה, ננסה להשתמש בנתיב הגולמי
+      if (bestPath) {
+        const rawUrl = bestPath.startsWith('http') ? bestPath : `${window.location.origin}${bestPath}`;
+        console.log(`[PostCard] Fallback to raw URL: ${rawUrl}`);
+        return rawUrl;
+      }
+      return '';
     }
   };
 
-  // בונה URL לתמונה בשימוש הפונקציה המשופרת
-  const buildImageUrl = (imagePath: string | null): string => {
-    if (!imagePath) return '';
+  // בדיקה אם יש תמונה לפוסט
+  const hasImage = (): boolean => {
+    const hasValidImage = !!(post.image || post.imgUrl || (post as any).imageUrl);
     
-    // שימוש בפונקציה שנוספה ל-API
-    return getImageUrl(imagePath);
+    if (hasValidImage) {
+      // בדיקה נוספת שהתמונה אינה נתיב ריק או לא תקין
+      const imagePath = getPostImageSource();
+      if (!imagePath || imagePath === '' || imagePath.includes('undefined') || imagePath.includes('null')) {
+        console.log(`[PostCard] Post ${postId} has image property but path is invalid: "${imagePath}"`);
+        return false;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // טיפול בשגיאת טעינת תמונה
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, postId: string) => {
+    try {
+      const img = e.currentTarget;
+      console.error(`[PostCard] Failed to load image for post ${postId}, url: ${img.src}`);
+      
+      // מסתיר את התמונה אם לא נטענה
+      img.style.display = 'none';
+      
+      // הסתרת הקונטיינר של התמונה במקרה של כשל בטעינה
+      const container = img.parentElement;
+      if (container) {
+        container.style.display = 'none';
+      }
+      
+      // ניסיון לתקן נתיב תמונה וטעינה מחדש
+      try {
+        // בדיקה אם מדובר בנתיב לוקאלי
+        const isLocalPath = img.src.includes('localhost') || img.src.includes(window.location.hostname);
+        
+        if (isLocalPath) {
+          // ניסיון לתקן את הנתיב
+          let newPath = '';
+          
+          // אם יש uploads בנתיב, ננסה לחלץ את החלק הרלוונטי
+          if (img.src.includes('/uploads/')) {
+            const pathParts = img.src.split('/uploads/');
+            if (pathParts.length > 1) {
+              const relativePath = `/uploads/${pathParts[1].split('?')[0]}`;
+              newPath = relativePath;
+            }
+          } else if (post.image) {
+            // ניסיון להשתמש בנתיב ישירות מהמודל
+            newPath = post.image.startsWith('/') ? post.image : `/${post.image}`;
+          } else if (post.imgUrl) {
+            // ניסיון להשתמש בנתיב imgUrl
+            newPath = post.imgUrl.startsWith('/') ? post.imgUrl : `/${post.imgUrl}`;
+          }
+          
+          if (newPath && newPath !== img.src) {
+            console.log(`[PostCard] Trying alternative image path: ${newPath}`);
+            
+            // בדיקה שהנתיב תקין
+            if (!newPath.includes('undefined') && !newPath.includes('null')) {
+              img.src = newPath;
+              img.style.display = 'block';
+              if (container) {
+                container.style.display = 'block';
+              }
+            }
+          }
+        }
+      } catch (retryError) {
+        console.error(`[PostCard] Error during image retry: ${retryError}`);
+      }
+    } catch (error) {
+      console.error(`[PostCard] Error handling image load failure: ${error}`);
+    }
   };
 
   return (
     <div className="post-card card h-100 shadow-sm animate-fade-in" onClick={() => navigate(`/post/${postId}`)}>
-      {post.image && (
+      {hasImage() && (
         <div className="post-image-container">
           <img 
-            src={buildImageUrl(post.image)}
+            src={getPostImageSource()}
             className="card-img-top" 
             alt="תמונת פוסט"
             loading="lazy"

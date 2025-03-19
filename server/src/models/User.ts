@@ -42,7 +42,7 @@ const UserSchema = new Schema(
     },
     profilePicture: {
       type: String,
-      default: ''
+      default: '/uploads/profile/default.jpg'
     },
     bio: {
       type: String,

@@ -216,50 +216,74 @@ export const callApiWithoutRedirect = async <T>(
 };
 
 /**
- * יוצר URL מלא לפי נתיב תמונה מהשרת
- * כולל אפשרות בדיקת תקינות התמונה דרך ה-API
+ * פונקציה שמנרמלת נתיבי תמונה לפורמט אחיד
+ * עם שימוש בנתיב API ייעודי להחזרת תמונות
  */
-export function getImageUrl(imagePath: string | null): string {
+export function getImageUrl(imagePath: string | null | undefined): string {
   // אם אין נתיב תמונה, להחזיר ריק
   if (!imagePath) {
     console.log('[api] getImageUrl called with null or empty path');
     return '';
   }
 
+  // לוג מצב התחלתי
+  console.log(`[api] Processing image path: "${imagePath}"`);
+
   // אם כבר URL מלא, להחזיר כמו שהוא
   if (imagePath.startsWith('http')) {
+    console.log(`[api] Using existing full URL: ${imagePath}`);
     return imagePath;
   }
   
   // ניקוי ובדיקת נתיב התמונה
-  let cleanPath = imagePath;
+  let cleanPath = imagePath.trim();
+  
+  // טיפול בתווים מיוחדים
+  cleanPath = cleanPath.replace(/\\/g, '/');
   
   // וידוא שהנתיב מתחיל עם סלאש
   if (!cleanPath.startsWith('/')) {
     cleanPath = '/' + cleanPath;
-    console.log(`[api] Fixed image path to start with slash: ${cleanPath}`);
+    console.log(`[api] Added leading slash: "${cleanPath}"`);
   }
-  
-  // בדיקה אם יש כבר את המסלול הנכון
-  if (!cleanPath.includes('/uploads/')) {
-    // אם יש רק שם קובץ, נוסיף את הנתיב המלא
-    if (cleanPath.startsWith('/') && !cleanPath.includes('/')) {
-      cleanPath = `/uploads/posts${cleanPath}`;
-    } else {
-      // ניסיון לתקן נתיב חלקי
-      cleanPath = `/uploads/posts/${cleanPath.split('/').pop()}`;
+
+  // טיפול בנתיבי uploads
+  if (cleanPath.includes('/uploads/')) {
+    // בדיקה שהנתיב תקין - אמור להיות בפורמט /uploads/{TYPE}/{FILENAME}
+    const pathParts = cleanPath.split('/uploads/');
+    if (pathParts.length > 1) {
+      // הסרת פרמטרים לא רצויים מהנתיב
+      const filePath = pathParts[1].split('?')[0];
+      
+      // בדיקה האם חסר חלק מהנתיב (למשל אם יש uploads/file.jpg במקום uploads/posts/file.jpg)
+      if (!filePath.includes('/') && (
+          !filePath.startsWith('posts/') && 
+          !filePath.startsWith('profile/')
+      )) {
+        // ננסה לזהות את סוג הקובץ לפי שם הקובץ
+        const fixedPath = filePath.startsWith('post-') 
+          ? `/uploads/posts/${filePath}` 
+          : filePath.startsWith('profile-') 
+            ? `/uploads/profile/${filePath}` 
+            : `/uploads/posts/${filePath}`;
+            
+        console.log(`[api] Fixed uploads path structure: "${fixedPath}"`);
+        cleanPath = fixedPath;
+      }
     }
-    console.log(`[api] Corrected image path: ${cleanPath}`);
   }
-  
-  // בניית URL מלא
-  const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-  const serverBase = baseURL.replace('/api', ''); // הסרת /api מהסוף כי התמונות נמצאות בתיקיה הראשית
-  
-  const fullUrl = `${serverBase}${cleanPath}`;
-  console.log(`[api] Full image URL: ${fullUrl}`);
-  
-  return fullUrl;
+
+  // בניית URL שלם
+  try {
+    const baseUrl = process.env.REACT_APP_API_URL || window.location.origin;
+    const fullUrl = new URL(cleanPath, baseUrl);
+    console.log(`[api] Built full URL: ${fullUrl.toString()}`);
+    return fullUrl.toString();
+  } catch (error) {
+    console.error(`[api] Error building URL: ${error}`);
+    // החזרת נתיב יחסי כמוצא אחרון
+    return cleanPath;
+  }
 }
 
 /**

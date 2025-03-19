@@ -2,17 +2,17 @@ import express from "express";
 import { body } from 'express-validator';
 import * as userController from '../controllers/userController';
 import { authenticateToken } from '../middleware/auth';
-import { uploadProfilePicture } from '../middleware/upload';
+import { uploadProfileImage, RequestWithFile } from '../middleware/upload';
 import { validate } from '../middleware/validation';
 import { Request, Response, NextFunction } from 'express';
 
 const router = express.Router();
 
 // Wrapper for controller functions to return void
-const asyncWrapper = (fn: (req: Request, res: Response) => Promise<any>) => {
+const asyncWrapper = (fn: (req: Request | RequestWithFile, res: Response, next?: NextFunction) => Promise<any> | any) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await fn(req, res);
+      await fn(req, res, next);
     } catch (error) {
       next(error);
     }
@@ -392,7 +392,9 @@ router.put(
 router.put(
   '/profile-picture',
   authenticateToken,
-  uploadProfilePicture,
+  (req, res, next) => {
+    uploadProfileImage(req as RequestWithFile, res, next);
+  },
   asyncWrapper(userController.updateProfilePicture)
 );
 

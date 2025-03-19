@@ -42,6 +42,7 @@ export interface Post {
   _id?: string;
   content: string;
   image?: string;
+  imgUrl?: string;
   user: User;
   likesCount: number;
   commentsCount: number;

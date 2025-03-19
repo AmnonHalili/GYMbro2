@@ -1,28 +1,34 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Schema, Document } from 'mongoose';
 import { IUser } from './User';
 
 export interface IPost extends Document {
-  user: IUser['_id'];
   content: string;
   image?: string;
+  user: IUser['_id'];
+  comments: number;
+  likes: number;
   likesCount: number;
   commentsCount: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const PostSchema: Schema = new Schema(
   {
+    content: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 1000
+    },
+    image: {
+      type: String,
+      default: null
+    },
     user: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true
-    },
-    content: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    image: {
-      type: String
     },
     likesCount: {
       type: Number,

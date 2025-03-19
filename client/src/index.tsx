@@ -11,14 +11,14 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 // הגדרה נכונה יותר של CLIENT_ID עם בדיקת תקינות
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 // וידוא שה-CLIENT_ID קיים ותקין (מתחיל ב-CLIENT_ID של גוגל, בדרך כלל מתחיל ב-)
-const isValidClientId = !!GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID.length > 20 && !GOOGLE_CLIENT_ID.startsWith('GOCSPX-');
+const isValidClientId = !!GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID.length > 20 && GOOGLE_CLIENT_ID.endsWith('.apps.googleusercontent.com');
 
 // לוג אבחון
 console.log('GoogleOAuthProvider setup with valid Client ID:', isValidClientId);
 if (!isValidClientId) {
   console.warn('Invalid Google Client ID detected - GoogleLogin functionality may not work correctly!');
   console.warn('Please check your .env.local file and make sure REACT_APP_GOOGLE_CLIENT_ID is set correctly.');
-  console.warn('Current value appears to be a secret key rather than a Client ID.');
+  console.warn('Current value:', GOOGLE_CLIENT_ID);
 }
 
 const root = ReactDOM.createRoot(

@@ -71,15 +71,25 @@ const PostList: React.FC = () => {
       // קריאה לשירות עם פרמטרים של עמוד ופילטר
       const response = await getPosts(pageNum, 10);
       
+      // בדיקה שיש נתונים בתשובה
+      if (!response || !response.data) {
+        console.error('Error fetching posts: No data in response');
+        throw new Error('לא התקבלו נתונים מהשרת');
+      }
+      
       const newPosts = response.data || [];
+      console.log(`[PostList] קבלת ${newPosts.length} פוסטים מהשרת`);
+      
       // מיפוי ועיבוד הפוסטים כדי לוודא שיש להם את כל השדות הנדרשים
       const processedPosts = newPosts.map((post: any) => {
         // וידוא שלפוסט יש גם id וגם _id
         const id = post.id || post._id;
+        
         // וידוא שלמשתמש יש גם id וגם _id
         const userId = post.user?.id || post.user?._id;
         
-        return {
+        // יצירת אובייקט פוסט עם כל השדות הנדרשים
+        const processedPost = {
           ...post,
           id,
           _id: id,
@@ -89,9 +99,39 @@ const PostList: React.FC = () => {
             _id: userId
           }
         };
+        
+        // טיפול בנתיבי תמונה
+        if (post.image || post.imgUrl) {
+          // איסוף כל מקורות התמונה האפשריים
+          const imagePaths = [post.image, post.imgUrl].filter(Boolean);
+          
+          if (imagePaths.length > 0) {
+            console.log(`[PostList] פוסט ${id} מכיל תמונות:`, imagePaths);
+            
+            // בחירת הנתיב הטוב ביותר (עדיפות לנתיב שמתחיל ב-/uploads/)
+            let bestPath = imagePaths.find(path => path && path.includes('/uploads/')) || imagePaths[0];
+            
+            // וידוא שהנתיב מתחיל נכון
+            if (bestPath && !bestPath.startsWith('/') && !bestPath.startsWith('http')) {
+              bestPath = '/' + bestPath;
+            }
+            
+            // שמירת אותו נתיב בשני השדות
+            processedPost.image = bestPath;
+            processedPost.imgUrl = bestPath;
+            
+            console.log(`[PostList] נתיב תמונה סופי לפוסט ${id}: ${bestPath}`);
+          }
+        } else {
+          console.log(`[PostList] פוסט ${id} ללא תמונות`);
+        }
+        
+        return processedPost;
       });
       
       const hasMoreItems = processedPosts.length === 10;
+      
+      console.log(`[PostList] עיבוד ${processedPosts.length} פוסטים, עוד נתונים: ${hasMoreItems}`);
       
       setPostsState(prev => ({
         items: append ? [...prev.items, ...processedPosts] : processedPosts,

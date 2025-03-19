@@ -186,6 +186,7 @@ export const updateProfilePicture = async (req: Request, res: Response) => {
     }
     
     const userId = userFromReq._id.toString();
+    console.log(`מעדכן תמונת פרופיל למשתמש: ${userId}`);
     
     // Get fresh user data from database
     const user = await User.findById(userId);
@@ -195,16 +196,30 @@ export const updateProfilePicture = async (req: Request, res: Response) => {
     
     // Handle profile picture if uploaded
     if (req.file) {
+      console.log(`קובץ תמונת פרופיל התקבל: ${req.file.originalname}, שם קובץ: ${req.file.filename}`);
+      
       // Delete old profile picture if exists
-      if (user.profilePicture) {
-        const oldPicturePath = path.join(__dirname, '../../', user.profilePicture);
-        if (fs.existsSync(oldPicturePath)) {
-          fs.unlinkSync(oldPicturePath);
+      if (user.profilePicture && user.profilePicture !== '/uploads/default.jpg') {
+        try {
+          // שימוש בנתיב יחסי
+          const oldPicturePath = path.join(process.cwd(), user.profilePicture.replace(/^\//, ''));
+          console.log(`בודק קיום קובץ פרופיל ישן: ${oldPicturePath}`);
+          
+          if (fs.existsSync(oldPicturePath)) {
+            fs.unlinkSync(oldPicturePath);
+            console.log(`נמחק קובץ פרופיל ישן: ${oldPicturePath}`);
+          } else {
+            console.log(`קובץ פרופיל ישן לא נמצא: ${oldPicturePath}`);
+          }
+        } catch (error) {
+          console.error(`שגיאה במחיקת תמונת פרופיל ישנה:`, error);
+          // ממשיכים גם אם יש שגיאה במחיקת הקובץ הישן
         }
       }
       
       // Set new profile picture path
       user.profilePicture = `/uploads/profile/${req.file.filename}`;
+      console.log(`נתיב תמונת פרופיל חדש: ${user.profilePicture}`);
       
       await user.save();
       
@@ -213,6 +228,7 @@ export const updateProfilePicture = async (req: Request, res: Response) => {
         profilePicture: user.profilePicture
       });
     } else {
+      console.log(`לא נשלחה תמונת פרופיל חדשה`);
       return res.status(400).json({ message: 'No profile picture uploaded' });
     }
   } catch (error) {
