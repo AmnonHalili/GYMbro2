@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import * as aiService from '../services/aiService';
+import { aiService } from '../services/aiService';
 import { NutritionalValuesRequest } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';

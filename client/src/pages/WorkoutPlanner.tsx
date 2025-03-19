@@ -120,10 +120,21 @@ const WorkoutPlanner: React.FC = () => {
     setErrors({});
     
     try {
-      const plan = await aiService.generateWorkoutPlan(formData);
+      console.log('[WorkoutPlanner] Submitting form data:', formData);
+      console.log('[WorkoutPlanner] Goals:', formData.goals);
+      
+      const validatedData = {
+        ...formData,
+        goals: Array.isArray(formData.goals) && formData.goals.length > 0 
+          ? formData.goals 
+          : ['הרזיה']
+      };
+      
+      console.log('[WorkoutPlanner] Validated form data:', validatedData);
+      
+      const plan = await aiService.generateWorkoutPlan(validatedData);
       setWorkoutPlan(plan);
       setPlanGenerated(true);
-      // Scroll to results
       setTimeout(() => {
         const resultsElement = document.getElementById('workout-results');
         if (resultsElement) {

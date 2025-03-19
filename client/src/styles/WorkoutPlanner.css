@@ -1,0 +1,284 @@
+/* WorkoutPlanner.css */
+:root {
+  --primary-color: #4caf50;
+  --primary-hover: #45a049;
+  --secondary-color: #3f51b5;
+  --light-gray: #f5f5f5;
+  --medium-gray: #e0e0e0;
+  --dark-gray: #757575;
+  --danger-color: #f44336;
+  --text-color: #333;
+  --border-radius: 8px;
+  --transition-speed: 0.3s;
+}
+
+/* כותרת עמוד */
+.page-title {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: var(--primary-color);
+  font-weight: 700;
+}
+
+/* סגנון כללי לטופס */
+.workout-form {
+  background-color: white;
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+/* רמת כושר */
+.fitness-level-options {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.option {
+  flex: 1;
+  padding: 0.75rem;
+  text-align: center;
+  background-color: var(--light-gray);
+  border: 2px solid var(--medium-gray);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all var(--transition-speed);
+}
+
+.option:hover {
+  background-color: var(--medium-gray);
+}
+
+.option.active {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+/* מטרות */
+.goals-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  min-height: 2.5rem;
+}
+
+.goal-tag {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--secondary-color);
+  color: white;
+  padding: 0.6rem 1rem;
+  border-radius: 20px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  transition: all 0.2s ease;
+}
+
+.goal-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.goal-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* לא בשימוש עוד, אבל משאירים למקרה שנחזיר אייקונים */
+.goal-icon {
+  font-size: 1.1rem;
+  margin-left: 2px;
+}
+
+.goal-tag button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  margin-right: -0.25rem;
+  margin-left: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  transition: background-color var(--transition-speed);
+}
+
+.goal-tag button:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.goal-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--medium-gray);
+  border-radius: var(--border-radius);
+  margin-bottom: 0.5rem;
+}
+
+.goal-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.goal-help {
+  font-size: 0.8rem;
+  color: var(--dark-gray);
+}
+
+/* ימי אימון בשבוע */
+.days-selector {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.days-selector button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background-color: var(--primary-color);
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-speed);
+}
+
+.days-selector button:hover {
+  background-color: var(--primary-hover);
+}
+
+.days-selector button:disabled {
+  background-color: var(--medium-gray);
+  cursor: not-allowed;
+}
+
+.days-selector input[type="range"] {
+  flex: 1;
+  height: 8px;
+  -webkit-appearance: none;
+  background: var(--medium-gray);
+  border-radius: 5px;
+  outline: none;
+}
+
+.days-selector input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+  border: none;
+}
+
+.days-selector input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+  border: none;
+}
+
+.days-display {
+  width: 30px;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* ציוד זמין */
+.equipment-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--medium-gray);
+  border-radius: var(--border-radius);
+  background-color: white;
+  font-size: 1rem;
+}
+
+.equipment-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+/* כפתור שליחה */
+.submit-button {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-speed);
+}
+
+.submit-button:hover {
+  background-color: var(--primary-hover);
+}
+
+.submit-button:disabled {
+  background-color: var(--medium-gray);
+  cursor: not-allowed;
+}
+
+/* תצוגת תוכנית האימון */
+.workout-plan-container {
+  background-color: white;
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.workout-plan-title {
+  margin-bottom: 1rem;
+  color: var(--primary-color);
+}
+
+.workout-plan-content {
+  line-height: 1.6;
+}
+
+/* טיפול במסכים קטנים */
+@media (max-width: 768px) {
+  .fitness-level-options {
+    flex-direction: column;
+  }
+  
+  .days-selector {
+    flex-direction: column;
+  }
+  
+  .workout-form {
+    padding: 1rem;
+  }
+} 
