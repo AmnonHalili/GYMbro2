@@ -15,14 +15,21 @@ export const setNavigate = (navigateFunction: any) => {
   navigate = navigateFunction;
 };
 
-// Create axios instance
+// בתחילת הקובץ, לפני יצירת אובייקט ה-API, אני רוצה לוודא שיש הגדרה נכונה של הבסיס URL
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+// יצירת instance חדש של axios עם קונפיגורציה בסיסית
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  baseURL: `${API_BASE_URL}/api`,
+  timeout: 20000, // 20 seconds timeout
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json'
   },
-  withCredentials: true, // Include cookies in cross-site requests
+  withCredentials: true // Include cookies in cross-site requests
 });
+
+console.log(`API Base URL configured to: ${API_BASE_URL}/api`);
 
 // Request interceptor for adding auth token
 api.interceptors.request.use(
@@ -156,7 +163,7 @@ api.interceptors.response.use(
         console.log('Attempting to refresh token');
         // Call refresh token endpoint
         const response = await axios.post(
-          `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/refresh-token`,
+          `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/auth/refresh-token`,
           { refreshToken },
           { withCredentials: true }
         );
@@ -216,51 +223,46 @@ export const callApiWithoutRedirect = async <T>(
 };
 
 /**
- * יוצר URL מלא לפי נתיב תמונה מהשרת
- * כולל אפשרות בדיקת תקינות התמונה דרך ה-API
+ * Creates a full URL for an image path from the server
+ * Handles various path formats and ensures proper URL construction
  */
-export function getImageUrl(imagePath: string | null): string {
-  // אם אין נתיב תמונה, להחזיר ריק
+export const getImageUrl = (imagePath: string | null | undefined): string => {
   if (!imagePath) {
-    console.log('[api] getImageUrl called with null or empty path');
+    console.warn('[API] Invalid image path:', imagePath);
     return '';
   }
 
-  // אם כבר URL מלא, להחזיר כמו שהוא
+  // If it's already a full URL, return as is
   if (imagePath.startsWith('http')) {
     return imagePath;
   }
+
+  // Clean the path and ensure it starts with a slash
+  let cleanPath = imagePath.trim();
   
-  // ניקוי ובדיקת נתיב התמונה
-  let cleanPath = imagePath;
-  
-  // וידוא שהנתיב מתחיל עם סלאש
+  // Log the path transformation for debugging
+  console.log('[API] Processing image path:', {
+    original: imagePath,
+    cleaned: cleanPath
+  });
+
+  // Ensure path starts with a slash
   if (!cleanPath.startsWith('/')) {
     cleanPath = '/' + cleanPath;
-    console.log(`[api] Fixed image path to start with slash: ${cleanPath}`);
   }
-  
-  // בדיקה אם יש כבר את המסלול הנכון
-  if (!cleanPath.includes('/uploads/')) {
-    // אם יש רק שם קובץ, נוסיף את הנתיב המלא
-    if (cleanPath.startsWith('/') && !cleanPath.includes('/')) {
-      cleanPath = `/uploads/posts${cleanPath}`;
-    } else {
-      // ניסיון לתקן נתיב חלקי
-      cleanPath = `/uploads/posts/${cleanPath.split('/').pop()}`;
-    }
-    console.log(`[api] Corrected image path: ${cleanPath}`);
-  }
-  
-  // בניית URL מלא
-  const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-  const serverBase = baseURL.replace('/api', ''); // הסרת /api מהסוף כי התמונות נמצאות בתיקיה הראשית
-  
+
+  // Get the base URL from environment or window origin
+  const serverBase = process.env.REACT_APP_API_URL || window.location.origin;
   const fullUrl = `${serverBase}${cleanPath}`;
-  console.log(`[api] Full image URL: ${fullUrl}`);
-  
+
+  console.log('[API] Generated image URL:', {
+    serverBase,
+    cleanPath,
+    fullUrl
+  });
+
   return fullUrl;
-}
+};
 
 /**
  * מפעיל את תהליך תיקון קבצי התמונות הריקים

@@ -112,11 +112,15 @@ const WorkoutPlanner: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (isSubmitting) return;
+    
     if (!validateForm()) {
       return;
     }
     
     setIsSubmitting(true);
+    setWorkoutPlan('');
+    setPlanGenerated(false);
     setErrors({});
     
     try {
@@ -132,9 +136,19 @@ const WorkoutPlanner: React.FC = () => {
       
       console.log('[WorkoutPlanner] Validated form data:', validatedData);
       
+      setWorkoutPlan('יוצר תוכנית אימונים מותאמת אישית... אנא המתן בסבלנות, זה עשוי לקחת כמה שניות.');
+      setPlanGenerated(true);
+      
+      setTimeout(() => {
+        const resultsElement = document.getElementById('workout-results');
+        if (resultsElement) {
+          resultsElement.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+      
       const plan = await aiService.generateWorkoutPlan(validatedData);
       setWorkoutPlan(plan);
-      setPlanGenerated(true);
+      
       setTimeout(() => {
         const resultsElement = document.getElementById('workout-results');
         if (resultsElement) {
@@ -143,9 +157,19 @@ const WorkoutPlanner: React.FC = () => {
       }, 200);
     } catch (error: any) {
       console.error('Error generating workout plan:', error);
-      setErrors({
-        general: error.message || 'אירעה שגיאה בעת יצירת תוכנית האימונים. נא לנסות שוב מאוחר יותר.'
-      });
+      
+      if (error.message && error.message.includes('timeout')) {
+        setErrors({
+          general: 'המערכת עמוסה כרגע ויצירת התוכנית לוקחת זמן רב. נסה שוב בעוד מספר דקות או בחר פרמטרים אחרים.'
+        });
+      } else {
+        setErrors({
+          general: error.message || 'אירעה שגיאה בעת יצירת תוכנית האימונים. נא לנסות שוב מאוחר יותר.'
+        });
+      }
+      
+      setPlanGenerated(false);
+      setWorkoutPlan('');
     } finally {
       setIsSubmitting(false);
     }
@@ -203,9 +227,23 @@ const WorkoutPlanner: React.FC = () => {
         </p>
 
         {errors.general && (
-          <Alert variant="danger" className="text-center">
-            {errors.general}
-          </Alert>
+          <div className="ai-error fade-in" id="workout-error">
+            <div className="ai-error-icon">⚠️</div>
+            <div className="ai-error-message">
+              <strong>שגיאה: </strong>
+              {errors.general}
+              <p>
+                <Button 
+                  onClick={() => setErrors({})} 
+                  variant="outline-secondary" 
+                  size="sm" 
+                  className="mt-2"
+                >
+                  סגור
+                </Button>
+              </p>
+            </div>
+          </div>
         )}
 
         <div className="ai-form-container">
@@ -328,7 +366,11 @@ const WorkoutPlanner: React.FC = () => {
         {isSubmitting && (
           <div className="ai-loading">
             <div className="ai-loading-spinner"></div>
-            <div className="ai-loading-text">מייצר תוכנית אימונים מותאמת אישית...</div>
+            <div className="ai-loading-text">
+              <strong>מייצר תוכנית אימונים מותאמת אישית...</strong>
+              <p>תהליך היצירה עשוי לקחת עד 60 שניות עקב עיבוד מורכב של בינה מלאכותית.</p>
+              <p>אנא המתן בסבלנות.</p>
+            </div>
           </div>
         )}
 

@@ -80,16 +80,16 @@ describe('User Profile API', () => {
   describe('Get User Profile', () => {
     test('should get user profile successfully', async () => {
       const response = await request(app)
-        .get(`/api/users/${testUser.username}`)
+        .get(`/api/users/username/${testUser.username}`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(500);
+        .expect(200);
     });
 
     test('should return 404 for non-existent user', async () => {
       const response = await request(app)
-        .get('/api/users/nonexistentuser')
+        .get('/api/users/username/nonexistentuser')
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(500);
+        .expect(404);
     });
   });
 
@@ -142,7 +142,7 @@ describe('User Profile API', () => {
         .put('/api/users/profile')
         .set('Authorization', `Bearer ${accessToken}`)
         .send(updateData)
-        .expect(500);
+        .expect(200);
     });
 
     test('should reject update with existing username', async () => {
@@ -172,7 +172,7 @@ describe('User Profile API', () => {
         .expect(401);
 
       expect(response.body).toHaveProperty('message');
-      expect(response.body.message).toContain('Access token is required');
+      expect(response.body.message).toContain('No authentication token provided');
     });
   });
 
@@ -196,7 +196,7 @@ describe('User Profile API', () => {
         .expect(401);
 
       expect(response.body).toHaveProperty('message');
-      expect(response.body.message).toContain('Access token is required');
+      expect(response.body.message).toContain('No authentication token provided');
     });
   });
 });

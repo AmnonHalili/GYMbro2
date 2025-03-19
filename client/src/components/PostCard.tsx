@@ -180,17 +180,54 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostDeleted }) => {
     }
   };
   
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, postId: string) => {
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const img = e.currentTarget;
-    console.error(`[PostCard] Failed to load image for post ${postId}, url: ${img.src}`);
+    console.error(`[PostCard] Failed to load image for post ${postId}:`, {
+      originalSrc: img.src,
+      postImage: post.image
+    });
     
-    // מסתיר את התמונה אם לא נטענה
-    img.style.display = 'none';
-    
-    // הסתרת הקונטיינר של התמונה במקרה של כשל בטעינה
-    const container = img.parentElement;
-    if (container) {
-      container.style.display = 'none';
+    try {
+      // If the image path is not valid, hide the image
+      if (!post.image) {
+        console.log('[PostCard] No image path available, hiding image');
+        img.style.display = 'none';
+        const container = img.parentElement;
+        if (container) {
+          container.style.display = 'none';
+        }
+        return;
+      }
+      
+      // Try to load the image with a direct path if the URL approach failed
+      const serverBase = process.env.REACT_APP_API_URL || window.location.origin;
+      const directPath = post.image.startsWith('/') 
+        ? `${serverBase}${post.image}`
+        : `${serverBase}/uploads/posts/${post.image}`;
+        
+      if (img.src !== directPath) {
+        console.log(`[PostCard] Retrying with direct path:`, {
+          originalSrc: img.src,
+          directPath,
+          postImage: post.image
+        });
+        img.src = directPath;
+      } else {
+        // If direct path also failed, hide the image
+        console.log('[PostCard] Direct path also failed, hiding image');
+        img.style.display = 'none';
+        const container = img.parentElement;
+        if (container) {
+          container.style.display = 'none';
+        }
+      }
+    } catch (error) {
+      console.error('[PostCard] Error handling image failure:', error);
+      img.style.display = 'none';
+      const container = img.parentElement;
+      if (container) {
+        container.style.display = 'none';
+      }
     }
   };
 
@@ -207,11 +244,11 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostDeleted }) => {
       {post.image && (
         <div className="post-image-container">
           <img 
-            src={buildImageUrl(post.image)}
+            src={getImageUrl(post.image)}
             className="card-img-top" 
             alt="תמונת פוסט"
             loading="lazy"
-            onError={(e) => handleImageError(e, postId)}
+            onError={handleImageError}
           />
         </div>
       )}

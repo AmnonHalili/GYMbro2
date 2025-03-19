@@ -4,6 +4,8 @@ type TokenPayload = {
   userId: string;
 };
 
+type ExpiresIn = string | number;
+
 // Determine the secret key based on token type
 const getSecret = (isRefresh: boolean): Buffer => {
   const secret = isRefresh 
@@ -24,7 +26,7 @@ const getSecret = (isRefresh: boolean): Buffer => {
  * @param isRefresh Whether this is a refresh token
  * @returns Generated JWT token
  */
-const generateToken = (userId: string, expiresIn: string, isRefresh = false): string => {
+export const generateToken = (userId: string, expiresIn: any, isRefresh = false): string => {
   const secret = getSecret(isRefresh);
   
   const payload: TokenPayload = { userId };
@@ -72,11 +74,11 @@ export const verifyToken = (token: string, isRefresh = false): TokenPayload | nu
 };
 
 // Generate access token
-export const generateAccessToken = (payload: object, expiresIn: string): string => {
+export const generateAccessToken = (payload: object, expiresIn: any): string => {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error('JWT_SECRET is not defined in environment variables');
   }
   
-  return jwt.sign(payload, secret, { expiresIn: expiresIn });
+  return jwt.sign(payload, secret, { expiresIn });
 }; 

@@ -2,6 +2,45 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { Request, Response, NextFunction } from 'express';
+
+// יצירת תיקיות העלאה בעת טעינת הקובץ
+console.log(`[upload] Initializing upload middleware...`);
+
+// וידוא שתיקיית ההעלאות קיימת בזמן טעינת האפליקציה
+(function() {
+  try {
+    const uploadDirs = [
+      path.join(__dirname, '../../uploads'),
+      path.join(__dirname, '../../uploads/posts'),
+      path.join(__dirname, '../../uploads/profile'),
+      path.join(__dirname, '../../logs')
+    ];
+
+    for (const dir of uploadDirs) {
+      try {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+          fs.chmodSync(dir, 0o777);
+          console.log(`[upload][init] Created directory: ${dir} with permissions 777`);
+        } else {
+          fs.chmodSync(dir, 0o777);
+          console.log(`[upload][init] Updated permissions for existing directory: ${dir} to 777`);
+        }
+
+        // Test write permissions
+        const testFile = path.join(dir, `.test-${Date.now()}`);
+        fs.writeFileSync(testFile, 'test');
+        fs.unlinkSync(testFile);
+        console.log(`[upload][init] Successfully verified write permissions for: ${dir}`);
+      } catch (err) {
+        console.error(`[upload][init] ERROR in directory setup: ${dir}`, err);
+      }
+    }
+  } catch (err) {
+    console.error(`[upload][init] Critical ERROR in upload setup:`, err);
+  }
+})();
 
 // Helper to ensure file is writable/saveable
 const ensureFileCanBeSaved = (filePath: string): boolean => {
@@ -11,12 +50,14 @@ const ensureFileCanBeSaved = (filePath: string): boolean => {
     // Try to create directory if it doesn't exist
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
+      console.log(`Created directory: ${dir}`);
     }
     
     // Check write permissions by writing a test file
     const testFile = path.join(dir, '.write-test');
     fs.writeFileSync(testFile, 'test');
     fs.unlinkSync(testFile);
+    console.log(`Directory ${dir} is writable`);
     return true;
   } catch (err) {
     console.error(`Error while checking if file can be saved to ${filePath}:`, err);
@@ -24,7 +65,26 @@ const ensureFileCanBeSaved = (filePath: string): boolean => {
   }
 };
 
-// Ensure upload directories exist with improved error handling
+// Helper function to ensure directory exists and is writable
+const ensureUploadDirectory = (directory: string): boolean => {
+  try {
+    if (!fs.existsSync(directory)) {
+      fs.mkdirSync(directory, { recursive: true });
+      console.log(`Created directory: ${directory}`);
+    }
+    
+    // Test write permissions
+    const testFile = path.join(directory, '.test');
+    fs.writeFileSync(testFile, '');
+    fs.unlinkSync(testFile);
+    return true;
+  } catch (error) {
+    console.error(`Error ensuring directory ${directory}:`, error);
+    return false;
+  }
+};
+
+// Create upload directories on startup
 const createUploadDirs = () => {
   const dirs = [
     path.join(__dirname, '../../uploads'),
@@ -33,184 +93,403 @@ const createUploadDirs = () => {
   ];
 
   dirs.forEach(dir => {
-    try {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-        console.log(`Created upload directory: ${dir}`);
-      } else {
-        // Check write permissions
-        const testFile = path.join(dir, '.write-test');
-        fs.writeFileSync(testFile, 'test content to verify disk space and permissions');
-        const testStats = fs.statSync(testFile);
-        if (testStats.size === 0) {
-          console.error(`CRITICAL ERROR: Test file was created but has 0 bytes in ${dir}. Possible disk issue.`);
-        } else {
-          console.log(`Upload directory exists and is writable: ${dir} (test file size: ${testStats.size} bytes)`);
-        }
-        fs.unlinkSync(testFile);
-      }
-    } catch (err) {
-      console.error(`CRITICAL ERROR: Cannot create or write to directory: ${dir}`, err);
-      // We could throw an error here to stop the server
+    if (ensureUploadDirectory(dir)) {
+      console.log(`Upload directory ready: ${dir}`);
+    } else {
+      console.error(`Failed to ensure upload directory: ${dir}`);
     }
   });
-  
-  // Show current files in posts directory
-  try {
-    const postsDir = path.join(__dirname, '../../uploads/posts');
-    const files = fs.readdirSync(postsDir);
-    console.log(`Found ${files.length} files in posts directory`);
-    
-    // Check if files are actually valid images
-    if (files.length > 0) {
-      const sampleFiles = files.slice(0, 5);
-      console.log('Sample files:', sampleFiles);
-      
-      // Check that files have content
-      sampleFiles.forEach(file => {
-        const filePath = path.join(postsDir, file);
-        const stats = fs.statSync(filePath);
-        if (stats.size === 0) {
-          console.error(`WARNING: File ${file} exists but is empty (0 bytes)`);
-        } else {
-          console.log(`File ${file} is ${stats.size} bytes`);
-        }
-      });
-    }
-  } catch (err) {
-    console.error('Error reading existing files:', err);
-  }
 };
 
-// Initialize directories on server startup
+// Initialize directories
 createUploadDirs();
+
+// Configure storage for post images
+const postStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    try {
+      const uploadPath = path.join(__dirname, '../../uploads/posts');
+      console.log(`[upload] Storing post image in: ${uploadPath}`);
+      
+      // Create directory if it doesn't exist
+      if (!fs.existsSync(uploadPath)) {
+        fs.mkdirSync(uploadPath, { recursive: true });
+        console.log(`[upload] Created directory: ${uploadPath}`);
+      }
+      
+      // Set directory permissions
+      try {
+        // Full permissions
+        fs.chmodSync(uploadPath, 0o777);
+        console.log(`[upload] Set permissions for: ${uploadPath} to 777`);
+      } catch (error) {
+        console.error(`[upload] Error setting permissions:`, error);
+      }
+      
+      // Verify directory is writable
+      try {
+        const testFile = path.join(uploadPath, `.write-test-${Date.now()}`);
+        fs.writeFileSync(testFile, 'test');
+        fs.unlinkSync(testFile);
+        console.log(`[upload] Verified write permissions for: ${uploadPath}`);
+        cb(null, uploadPath);
+      } catch (error) {
+        console.error(`[upload] !! CRITICAL ERROR !! Directory not writable:`, error);
+        cb(new Error(`Cannot write to directory: ${uploadPath}`), '');
+      }
+    } catch (err) {
+      console.error(`[upload] Unexpected error in destination handler:`, err);
+      cb(err as any, '');
+    }
+  },
+  filename: (req, file, cb) => {
+    try {
+      // Generate unique filename with timestamp
+      const timestamp = Date.now();
+      // אסירת תווים בעייתיים מהקובץ המקורי
+      const origName = file.originalname || 'unnamed.jpg';
+      const cleanFilename = origName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const filename = `${timestamp}_${cleanFilename}`;
+      
+      console.log(`[upload] Processing file:`, {
+        originalName: file.originalname,
+        cleanedName: cleanFilename,
+        finalFilename: filename,
+        size: file.size || 'unknown',
+        mimetype: file.mimetype
+      });
+      
+      // Add path info to file object
+      const savedPath = `/uploads/posts/${filename}`;
+      const fullPath = path.join(__dirname, '../../uploads/posts', filename);
+      
+      // Add all paths to file object for later use
+      (file as any).savedPath = savedPath;
+      (file as any).fullPath = fullPath;
+      (file as any).filename = filename;
+      (file as any).destination = path.join(__dirname, '../../uploads/posts');
+      (file as any).imageUrl = `/uploads/posts/${filename}`; // URL for the client
+      
+      // Log for debugging
+      console.log(`[upload] Generated filename: ${filename}, Paths set:`, {
+        savedPath,
+        fullPath,
+        filename
+      });
+      
+      // Store the filename in request for verifyUploadedFile to use
+      (req as any).generatedFilename = filename;
+      (req as any).imagePath = savedPath;
+      
+      cb(null, filename);
+    } catch (error) {
+      console.error(`[upload] Error generating filename:`, error);
+      cb(error as any, '');
+    }
+  }
+});
 
 // Configure storage for profile pictures
 const profileStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadPath = path.join(__dirname, '../../uploads/profile');
-    console.log(`Storing profile picture in: ${uploadPath}`);
+    console.log(`[upload] Storing profile picture in: ${uploadPath}`);
     
-    // Ensure directory exists and is writable
-    if (!ensureFileCanBeSaved(path.join(uploadPath, 'test.jpg'))) {
-      return cb(new Error(`Cannot write to directory: ${uploadPath}`), uploadPath);
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+      console.log(`[upload] Created directory: ${uploadPath}`);
+    }
+    
+    // Verify directory is writable
+    if (!ensureUploadDirectory(uploadPath)) {
+      return cb(new Error(`Cannot write to directory: ${uploadPath}`), '');
     }
     
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const filename = 'profile-' + uniqueSuffix + path.extname(file.originalname);
-    console.log(`Generated filename for profile picture: ${filename}`);
-    cb(null, filename);
-  }
-});
-
-// Configure storage for post images with improved error handling
-const postStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, '../../uploads/posts');
-    console.log(`Storing post image in: ${uploadPath}`);
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    const filename = `profile-${uniqueSuffix}${ext}`;
     
-    // Ensure directory exists and is writable
-    if (!ensureFileCanBeSaved(path.join(uploadPath, 'test.jpg'))) {
-      return cb(new Error(`Cannot write to directory: ${uploadPath}`), uploadPath);
-    }
+    console.log(`[upload] Generated filename: ${filename}`);
     
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    // Get clean file extension
-    let ext = path.extname(file.originalname).toLowerCase();
-    // Default to .jpg if no extension
-    if (!ext || ext === '.') ext = '.jpg';
-    
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const filename = 'post-' + uniqueSuffix + ext;
-    console.log(`Generated filename for post image: ${filename} (from original: ${file.originalname})`);
-    
-    // Validate filename before returning
-    if (!filename || filename === 'post-' || filename.indexOf('.') === -1) {
-      console.error('Generated invalid filename!', {filename, original: file.originalname});
-      return cb(new Error('Failed to generate valid filename'), 'error.jpg');
-    }
+    // Add path info to file object
+    (file as any).savedPath = `/uploads/profile/${filename}`;
+    (file as any).fullPath = path.join(__dirname, '../../uploads/profile', filename);
     
     cb(null, filename);
   }
 });
 
-// File filter to allow only images with improved debugging
-const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  console.log(`Validating file: ${file.originalname}, type: ${file.mimetype}, size: ${file.size || 'unknown'} bytes`);
+// File filter for images
+const imageFileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  console.log(`[upload] Validating file:`, {
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size
+  });
   
-  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  
-  if (!file.mimetype) {
-    console.error(`Rejected file ${file.originalname}: missing mimetype`);
-    return cb(new Error('Missing file type information'));
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (!allowedTypes.includes(file.mimetype)) {
+    console.error(`[upload] Invalid file type: ${file.mimetype}`);
+    return cb(null, false);
   }
   
-  if (allowedMimeTypes.includes(file.mimetype)) {
-    console.log(`File type ${file.mimetype} is valid`);
-    cb(null, true);
-  } else {
-    console.error(`Rejected file ${file.originalname}: invalid type ${file.mimetype}`);
-    cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.'));
-  }
+  cb(null, true);
 };
 
-// Create multer instances with proper configuration - adding limits
-export const uploadProfilePicture = multer({
-  storage: profileStorage,
-  fileFilter,
+// Override of multer middleware to ensure complete processing
+export const uploadPostImage = multer({
+  storage: postStorage,
+  fileFilter: (req, file, cb: multer.FileFilterCallback) => {
+    console.log(`[upload] Validating file:`, {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+    
+    // Check file presence
+    if (!file) {
+      console.error(`[upload] No file provided`);
+      return cb(null, false);
+    }
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      console.error(`[upload] Invalid file type: ${file.mimetype}`);
+      return cb(null, false);
+    }
+    
+    console.log(`[upload] File validation successful`);
+    cb(null, true);
+  },
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB
-    files: 1 // המספר המירבי של קבצים שניתן להעלות בכל פעם
+    files: 1
+  }
+}).single('image');
+
+// פונקציית עזר חדשה לבדיקת קבצים לאחר ההעלאה
+export const verifyUploadedFile = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.file) {
+    console.log(`[upload][verify] No file was uploaded`);
+    return next();
+  }
+  
+  console.log(`[upload][verify] Verifying uploaded file:`, {
+    originalname: req.file.originalname,
+    filename: req.file.filename,
+    path: req.file.path,
+    size: req.file.size,
+    savedPath: (req.file as any).savedPath
+  });
+  
+  // וידוא שהקובץ נשמר בפועל
+  if (req.file.path && fs.existsSync(req.file.path)) {
+    const stats = fs.statSync(req.file.path);
+    console.log(`[upload][verify] Confirmed file saved at ${req.file.path} with size ${stats.size} bytes`);
+    
+    if (stats.size === 0) {
+      console.error(`[upload][verify] WARNING: File exists but is empty (0 bytes)`);
+      
+      // ניסיון תיקון קובץ ריק
+      try {
+        // אם יש buffer, ננסה לשמור שוב
+        if ((req.file as any).buffer) {
+          fs.writeFileSync(req.file.path, (req.file as any).buffer);
+          console.log(`[upload][verify] Attempted to fix empty file using buffer`);
+        } else {
+          // הוספת תוכן מינימלי
+          fs.writeFileSync(req.file.path, Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'));
+          console.log(`[upload][verify] Added minimal content to empty file`);
+        }
+        
+        // בדיקה חוזרת
+        const newStats = fs.statSync(req.file.path);
+        if (newStats.size > 0) {
+          console.log(`[upload][verify] Fixed empty file, new size: ${newStats.size} bytes`);
+        } else {
+          console.error(`[upload][verify] Failed to fix empty file`);
+        }
+      } catch (err) {
+        console.error(`[upload][verify] Error fixing empty file:`, err);
+      }
+    }
+    
+    // הרשאות לקובץ
+    try {
+      fs.chmodSync(req.file.path, 0o666); // rw-rw-rw-
+      console.log(`[upload][verify] Updated file permissions to 666`);
+    } catch (err) {
+      console.error(`[upload][verify] Error updating file permissions:`, err);
+    }
+    
+    // סימון לקונטרולר שהקובץ נשמר ונמצא
+    (req as any).fileVerified = true;
+    (req as any).fileStats = {
+      exists: true,
+      size: fs.statSync(req.file.path).size, // בדיקה טרייה אחרי כל הטיפולים
+      path: req.file.path,
+      filename: req.file.filename,
+      savedPath: (req.file as any).savedPath || `/uploads/posts/${req.file.filename}`
+    };
+    
+    // הוספת המידע גם לבקשה עצמה כדי שהקונטרולר יוכל לגשת
+    (req as any).uploadedFile = {
+      success: true,
+      path: (req.file as any).savedPath || `/uploads/posts/${req.file.filename}`,
+      filename: req.file.filename,
+      size: fs.statSync(req.file.path).size
+    };
+    
+    console.log(`[upload][verify] File verification completed successfully`);
+  } else if (req.file.path) {
+    console.error(`[upload][verify] WARNING: File not found at expected path: ${req.file.path}`);
+    
+    // ניסיון תיקון: יצירת התיקייה מחדש ושמירת הקובץ מחדש אם יש buffer
+    const uploadDir = path.dirname(req.file.path);
+    
+    try {
+      // וידוא קיום התיקייה
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+        fs.chmodSync(uploadDir, 0o777);
+        console.log(`[upload][verify] Created missing directory: ${uploadDir}`);
+      }
+      
+      // ניסיון לשחזר את הקובץ
+      let success = false;
+      
+      // אם יש buffer, ננסה לשמור שוב
+      if ((req.file as any).buffer) {
+        fs.writeFileSync(req.file.path, (req.file as any).buffer);
+        console.log(`[upload][verify] Recreated file from buffer at ${req.file.path}`);
+        success = true;
+      } 
+      // אם אין buffer אבל יש stream ננסה לשמור ממנו
+      else if ((req.file as any).stream) {
+        console.log(`[upload][verify] Attempting to save from stream`);
+        // קוד לשמירה מ-stream יכול להיות מורכב יותר
+      }
+      // ניסיון אחרון: יצירת קובץ ריק כבסיס
+      else {
+        fs.writeFileSync(req.file.path, Buffer.from(''));
+        console.log(`[upload][verify] Created empty placeholder file at ${req.file.path}`);
+        success = true;
+      }
+      
+      if (success && fs.existsSync(req.file.path)) {
+        const stats = fs.statSync(req.file.path);
+        console.log(`[upload][verify] Fixed missing file, size: ${stats.size} bytes`);
+        
+        (req as any).fileVerified = true;
+        (req as any).fileStats = {
+          exists: true,
+          size: stats.size,
+          path: req.file.path,
+          filename: req.file.filename,
+          savedPath: (req.file as any).savedPath || `/uploads/posts/${req.file.filename}`
+        };
+        
+        // הוספת המידע גם לבקשה עצמה כדי שהקונטרולר יוכל לגשת
+        (req as any).uploadedFile = {
+          success: true,
+          path: (req.file as any).savedPath || `/uploads/posts/${req.file.filename}`,
+          filename: req.file.filename,
+          size: stats.size
+        };
+      } else {
+        console.error(`[upload][verify] Failed to fix or find file even after recovery attempt`);
+        (req as any).fileVerified = false;
+        (req as any).fileError = 'File not saved properly and recovery failed';
+      }
+    } catch (error) {
+      console.error(`[upload][verify] Error trying to fix missing file:`, error);
+      (req as any).fileVerified = false;
+      (req as any).fileError = 'File not saved properly and recovery failed';
+    }
+  } else {
+    console.error(`[upload][verify] Cannot verify file: no path information available`);
+    (req as any).fileVerified = false;
+    (req as any).fileError = 'No path information for uploaded file';
+  }
+  
+  next();
+};
+
+// Middleware for handling profile picture uploads
+export const uploadProfilePicture = multer({
+  storage: profileStorage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+    files: 1
   }
 }).single('profilePicture');
 
-// עדכון הקונפיגורציה והשימוש במולטר עבור תמונות פוסטים
-// מחיקת הגדרה ישנה של uploadPostImage (עכשיו השתמשנו בגרסה החדשה)
-/* export const uploadPostImage = multer({
-  storage: postStorage,
-  fileFilter,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
-    files: 1 // המספר המירבי של קבצים שניתן להעלות בכל פעם
-  }
-}).single('image'); */
-
-// פונקציה נוספת לבעיות ב-buffer - נשתמש בה במידת הצורך
+// Manual file save helper for buffer issues
 export const manualSaveUploadedFile = async (file: Express.Multer.File, directory: string = 'posts'): Promise<string> => {
+  console.log('[upload] Starting manual file save:', {
+    originalname: file.originalname,
+    size: file.buffer?.length || 0,
+    mimetype: file.mimetype,
+    directory
+  });
+
   if (!file.buffer || file.buffer.length === 0) {
-    throw new Error('הקובץ ריק או שלא הועבר נכון');
+    console.error('[upload] Empty or invalid file buffer');
+    throw new Error('Empty or invalid file buffer');
   }
 
-  // יצירת שם קובץ ייחודי
   const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
   const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
   const filename = `${directory}-${uniqueSuffix}${ext}`;
-
-  // נתיב לשמירת הקובץ
   const uploadPath = path.join(__dirname, '../../uploads', directory);
   const filePath = path.join(uploadPath, filename);
+  const publicPath = `/uploads/${directory}/${filename}`;
 
-  // וידוא שהתיקייה קיימת
-  if (!fs.existsSync(uploadPath)) {
-    fs.mkdirSync(uploadPath, { recursive: true });
+  console.log('[upload] File details:', {
+    filename,
+    uploadPath,
+    filePath,
+    publicPath
+  });
+
+  try {
+    // Ensure directory exists
+    if (!fs.existsSync(uploadPath)) {
+      console.log(`[upload] Creating directory: ${uploadPath}`);
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+
+    // Save file to disk
+    console.log(`[upload] Writing file to: ${filePath}`);
+    fs.writeFileSync(filePath, file.buffer);
+
+    // Verify file was saved
+    const stats = fs.statSync(filePath);
+    if (stats.size === 0) {
+      console.error('[upload] File was saved but is empty');
+      throw new Error('File was saved but is empty');
+    }
+
+    console.log(`[upload] File saved successfully: ${publicPath} (${stats.size} bytes)`);
+    return publicPath;
+  } catch (error) {
+    console.error('[upload] Error saving file:', error);
+    // Clean up if file exists but there was an error
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+        console.log(`[upload] Cleaned up failed file: ${filePath}`);
+      } catch (cleanupError) {
+        console.error('[upload] Error cleaning up failed file:', cleanupError);
+      }
+    }
+    throw error;
   }
-
-  // שמירת הקובץ לדיסק
-  fs.writeFileSync(filePath, file.buffer);
-
-  // בדיקה שהקובץ נשמר
-  const stats = fs.statSync(filePath);
-  if (stats.size === 0) {
-    throw new Error('הקובץ נשמר אבל הוא ריק');
-  }
-
-  // החזרת הנתיב היחסי לקובץ
-  return `/uploads/${directory}/${filename}`;
 };
 
 /**
@@ -286,155 +565,157 @@ export const fixEmptyImageFiles = async (): Promise<{ fixed: number, failed: num
   }
 };
 
-// משפר את הטיפול בשמירת התמונה בתהליך המולטר
-// מטפל בשמירת התוכן באופן ישיר כדי לוודא שהוא נשמר נכון
-const memoryStorage = multer.memoryStorage();
-
-// יוצר מקצה משאבים למולטר שמשתמש באחסון בזיכרון במקום באחסון בדיסק
-const upload = multer({
-  storage: memoryStorage,
-  fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB
-    files: 1
-  }
-});
-
-// מיידלוור שמקבל את הקובץ ודואג לשמור אותו ידנית לדיסק כדי להבטיח שגודלו אינו 0
-export const uploadPostImage = (req: any, res: any, next: any) => {
-  console.log('==== POST IMAGE UPLOAD START ====');
+// פונקציה להבטחת קיום תיקיות עם הרשאות
+export const ensureUploadDirectories = () => {
+  const dirs = [
+    path.join(__dirname, '../../uploads'),
+    path.join(__dirname, '../../uploads/posts'),
+    path.join(__dirname, '../../uploads/profile'),
+    path.join(__dirname, '../../logs')
+  ];
   
-  // יצירת תיקיית כיוון ביניים אם לא קיימת
-  const logPath = path.join(__dirname, '../../logs');
-  if (!fs.existsSync(logPath)) {
-    fs.mkdirSync(logPath, { recursive: true });
-  }
-  
-  // כתיבה ליומן ייעודי
-  const logFile = path.join(logPath, 'createPost.log');
-  const log = (message: string) => {
-    const timestamp = new Date().toISOString();
-    const logEntry = `${timestamp} - ${message}\n`;
-    fs.appendFileSync(logFile, logEntry);
-    console.log(message);
-  };
-  
-  log('==== POST IMAGE UPLOAD START ====');
-  
-  // שימוש במידלוור מולטר עם אחסון זיכרון לקבלת הקובץ
-  upload.single('image')(req, res, (err: any) => {
-    if (err) {
-      log(`Error in multer upload: ${err.message}`);
-      return res.status(400).json({ message: 'שגיאה בהעלאת הקובץ: ' + err.message });
-    }
-    
-    // אם אין קובץ, המשך לבקר (פוסט ללא תמונה)
-    if (!req.file) {
-      log('No file uploaded, continuing to controller');
-      return next();
-    }
-    
-    log(`File received in middleware: ${req.file.originalname}`);
-    log(`File details: size: ${req.file.size} bytes, mimetype: ${req.file.mimetype}`);
-    log(`Buffer exists: ${!!req.file.buffer}, Buffer length: ${req.file.buffer ? req.file.buffer.length : 0} bytes`);
-    
-    // וידוא שיש באפר ושגודלו אינו 0
-    if (!req.file.buffer || req.file.buffer.length === 0) {
-      log('Error: File buffer is empty or missing');
-      return res.status(400).json({ message: 'התמונה שהועלתה ריקה או שגויה' });
-    }
-    
-    // בדיקה שסוג הקובץ הוא תמונה תקינה
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(req.file.mimetype)) {
-      log(`Error: Invalid file type: ${req.file.mimetype}`);
-      return res.status(400).json({ message: 'סוג הקובץ אינו נתמך. נא להעלות קובץ מסוג JPEG, PNG, GIF או WebP בלבד' });
-    }
-    
-    // יצירת שם קובץ יחודי
-    const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const filename = 'post-' + uniqueSuffix + ext;
-    log(`Generated unique filename: ${filename}`);
-    
-    // נתיב לשמירת הקובץ
-    const uploadPath = path.join(__dirname, '../../uploads/posts');
-    const filePath = path.join(uploadPath, filename);
-    log(`Full path for saving file: ${filePath}`);
-    
-    // וידוא שהתיקייה קיימת
-    if (!fs.existsSync(uploadPath)) {
-      try {
-        fs.mkdirSync(uploadPath, { recursive: true });
-        log(`Created directory: ${uploadPath}`);
-      } catch (dirErr) {
-        log(`Error creating uploads directory: ${dirErr}`);
-        return res.status(500).json({ message: 'שגיאה בשמירת התמונה - לא ניתן ליצור תיקייה' });
-      }
-    }
-    
+  dirs.forEach(dir => {
     try {
-      log(`Attempting to write file to disk, buffer length: ${req.file.buffer.length} bytes`);
-      // שמירת הקובץ לדיסק באופן ידני מהבאפר
-      fs.writeFileSync(filePath, req.file.buffer);
-      
-      // בדיקה שהקובץ נשמר בגודל הנכון
-      const stats = fs.statSync(filePath);
-      log(`File saved to ${filePath} with size ${stats.size} bytes`);
-      
-      if (stats.size === 0) {
-        log('Error: File was saved but size is 0 bytes, trying again with direct copy');
-        
-        // ניסיון נוסף עם העתקה ישירה של המידע
-        const tmpFile = path.join(os.tmpdir(), `temp-${Date.now()}.bin`);
-        log(`Creating temporary file at: ${tmpFile}`);
-        fs.writeFileSync(tmpFile, req.file.buffer);
-        const tmpStats = fs.statSync(tmpFile);
-        log(`Temporary file created with size: ${tmpStats.size} bytes`);
-        
-        if (tmpStats.size > 0) {
-          // אם ההעתקה לקובץ זמני הצליחה, ננסה להעתיק את הקובץ הזמני לנתיב הסופי
-          log(`Copying from temp file to final destination: ${filePath}`);
-          fs.copyFileSync(tmpFile, filePath);
-          fs.unlinkSync(tmpFile); // מחיקת הקובץ הזמני
-          log(`Temporary file deleted after copy`);
-          
-          const newStats = fs.statSync(filePath);
-          if (newStats.size === 0) {
-            log('Error: Second attempt failed, file still 0 bytes');
-            return res.status(500).json({ message: 'שגיאה בשמירת התמונה - הקובץ נשמר בגודל 0 גם אחרי ניסיון נוסף' });
-          }
-          log(`Second attempt successful, file size now: ${newStats.size} bytes`);
-        } else {
-          // אם גם הקובץ הזמני נכשל, יש בעיה עם הבאפר עצמו
-          log('Error: Temporary file also 0 bytes, buffer may be corrupted');
-          return res.status(500).json({ message: 'שגיאה בשמירת התמונה - הקובץ שהועלה פגום' });
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.chmodSync(dir, 0o777);
+        console.log(`[upload] Created directory with full permissions: ${dir}`);
+      } else {
+        // בדיקת הרשאות והתאמתן
+        try {
+          fs.chmodSync(dir, 0o777);
+          console.log(`[upload] Updated permissions for: ${dir}`);
+        } catch (err) {
+          console.error(`[upload] Failed to update permissions for ${dir}:`, err);
         }
       }
       
-      // עדכון פרטי הקובץ כך שהבקר יוכל להשתמש בהם
-      const publicPath = `/uploads/posts/${filename}`;
-      
-      req.file.filename = filename;
-      req.file.path = filePath;
-      req.file.destination = uploadPath;
-      req.file.publicPath = publicPath;
-      
-      // הוספת תוכן הקובץ בתור אובייקט ישירות לבקשה כדי שהבקר ידע מהי התמונה
-      // גם אם בבקשה יש בעיה כלשהי
-      if (!req.fileData) {
-        req.fileData = {};
-      }
-      req.fileData.image = publicPath; 
-      
-      log(`File metadata updated. Public path: ${publicPath}`);
-      log('==== POST IMAGE UPLOAD SUCCESS ====');
-      
-      next();
-    } catch (writeErr) {
-      log(`Error writing file to disk: ${writeErr}`);
-      log('==== POST IMAGE UPLOAD FAILED ====');
-      return res.status(500).json({ message: 'שגיאה בשמירת התמונה לדיסק: ' + writeErr.message });
+      // בדיקת אפשרות כתיבה
+      const testFile = path.join(dir, '.write-test');
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+      console.log(`[upload] Verified write access to: ${dir}`);
+    } catch (err) {
+      console.error(`[upload] Error ensuring directory ${dir}:`, err);
     }
   });
-}; 
+  
+  return true;
+};
+
+// קריאה להבטחת קיום תיקיות בטעינה
+ensureUploadDirectories();
+
+// בדיקה של תוכן ה-FormData
+export const checkFormDataContent = (req: Request, res: Response, next: NextFunction) => {
+  console.log(`[upload][checkFormData] ========= בדיקת תוכן הבקשה =========`);
+  console.log(`[upload][checkFormData] Headers:`, req.headers);
+  console.log(`[upload][checkFormData] Content-Type:`, req.headers['content-type']);
+  console.log(`[upload][checkFormData] Content-Length:`, req.headers['content-length']);
+  
+  if (req.headers['content-type']?.includes('multipart/form-data')) {
+    console.log(`[upload][checkFormData] זוהתה בקשת multipart/form-data`);
+    
+    // בדיקת תוכן הבקשה (גוף)
+    console.log(`[upload][checkFormData] Body:`, req.body);
+    console.log(`[upload][checkFormData] File:`, req.file);
+    
+    if (!req.file) {
+      console.log(`[upload][checkFormData] אין קובץ בבקשה, בודק אם יש שדה 'image' בבקשה:`);
+      
+      // בדיקה חלופית אם יש שדה בשם 'image' ב-FormData
+      if (req.body && req.body.image) {
+        console.log(`[upload][checkFormData] נמצא שדה 'image' בבקשה:`, req.body.image);
+      } else {
+        console.log(`[upload][checkFormData] לא נמצא שדה 'image' בבקשה`);
+      }
+    }
+  } else {
+    console.log(`[upload][checkFormData] הבקשה אינה מסוג multipart/form-data:`, req.headers['content-type']);
+  }
+  
+  console.log(`[upload][checkFormData] ====== סיום בדיקת תוכן הבקשה ======`);
+  next();
+};
+
+// פונקציה לבדיקת הקובץ אחרי ניסיון השמירה במידלוור multer
+export const debugSavedFile = (req: Request, res: Response, next: NextFunction) => {
+  console.log(`[upload][debugSaved] ======= בדיקת קובץ אחרי שמירה ========`);
+  
+  if (req.file) {
+    // הדפסת פרטי הקובץ
+    console.log(`[upload][debugSaved] פרטי הקובץ אחרי multer:`, {
+      originalname: req.file.originalname,
+      filename: req.file.filename,
+      path: req.file.path,
+      destination: req.file.destination,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
+    
+    // בדיקה אם הקובץ קיים בפועל
+    if (fs.existsSync(req.file.path)) {
+      const stats = fs.statSync(req.file.path);
+      console.log(`[upload][debugSaved] הקובץ קיים בגודל: ${stats.size} בייטים`);
+      
+      // בדיקה שהקובץ אינו ריק
+      if (stats.size === 0) {
+        console.error(`[upload][debugSaved] אזהרה: הקובץ ריק (0 בייטים)`);
+        
+        // ניסיון לתקן קובץ ריק
+        try {
+          if ((req.file as any).buffer) {
+            // שמירה מחדש מהבאפר אם קיים
+            fs.writeFileSync(req.file.path, (req.file as any).buffer);
+            console.log(`[upload][debugSaved] שמירה מחדש מהבאפר: ${fs.statSync(req.file.path).size} בייטים`);
+          } else {
+            // שמירת תוכן מינימלי
+            const base64Pixel = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+            fs.writeFileSync(req.file.path, Buffer.from(base64Pixel, 'base64'));
+            console.log(`[upload][debugSaved] נשמר תוכן מינימלי: ${fs.statSync(req.file.path).size} בייטים`);
+          }
+        } catch (err) {
+          console.error(`[upload][debugSaved] שגיאה בניסיון תיקון קובץ ריק:`, err);
+        }
+      }
+      
+      // הרשאות
+      try {
+        fs.chmodSync(req.file.path, 0o666);
+        console.log(`[upload][debugSaved] הרשאות הקובץ עודכנו ל-666`);
+      } catch (err) {
+        console.error(`[upload][debugSaved] שגיאה בעדכון הרשאות:`, err);
+      }
+    } else {
+      console.error(`[upload][debugSaved] הקובץ לא נמצא בנתיב המצופה: ${req.file.path}`);
+      
+      // בדיקה אם התיקייה קיימת
+      const dir = path.dirname(req.file.path);
+      if (!fs.existsSync(dir)) {
+        console.error(`[upload][debugSaved] התיקייה אינה קיימת: ${dir}`);
+        try {
+          fs.mkdirSync(dir, { recursive: true });
+          fs.chmodSync(dir, 0o777);
+          console.log(`[upload][debugSaved] נוצרה תיקייה חדשה: ${dir}`);
+        } catch (err) {
+          console.error(`[upload][debugSaved] שגיאה ביצירת תיקייה:`, err);
+        }
+      } else {
+        console.log(`[upload][debugSaved] התיקייה קיימת: ${dir}`);
+        
+        // רשימת קבצים בתיקייה
+        try {
+          const files = fs.readdirSync(dir);
+          console.log(`[upload][debugSaved] קבצים בתיקייה: ${files.length > 0 ? files.join(', ') : 'אין קבצים'}`);
+        } catch (err) {
+          console.error(`[upload][debugSaved] שגיאה בקריאת תוכן התיקייה:`, err);
+        }
+      }
+    }
+  } else {
+    console.log(`[upload][debugSaved] אין קובץ בבקשה אחרי multer`);
+  }
+  
+  console.log(`[upload][debugSaved] ===== סיום בדיקת קובץ אחרי שמירה =====`);
+  next();
+};

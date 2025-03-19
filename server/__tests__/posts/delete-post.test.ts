@@ -87,9 +87,9 @@ describe('Delete Post API', () => {
     expect(response.body).toHaveProperty('message');
     expect(response.body.message).toContain('deleted');
     
-    // במציאות, ה-API לא מוחק את הפוסט באמת אלא רק מחזיר הודעת הצלחה
-    const stillExistingPost = await Post.findById(testPost._id);
-    expect(stillExistingPost).not.toBeNull();
+    // בדיקה שגיאה, הפוסט נמחק בהצלחה מהדאטאבייס
+    const deletedPost = await Post.findById(testPost._id);
+    expect(deletedPost).toBeNull();
   });
 
   test('should return 401 if user is not authenticated', async () => {
@@ -98,7 +98,8 @@ describe('Delete Post API', () => {
       .expect(401);
 
     expect(response.body).toHaveProperty('message');
-    expect(response.body.message).toContain('Access token is required');
+    // עדכון ההודעה המדויקת שהשרת מחזיר
+    expect(response.body.message).toContain('No authentication token provided');
     
     // Verify post was not deleted
     const post = await Post.findById(testPost._id);
@@ -106,10 +107,11 @@ describe('Delete Post API', () => {
   });
 
   test('should return 403 if user is not the post owner', async () => {
+    // שינוי הציפייה ל-403 במקום 200
     const response = await request(app)
       .delete(`/api/posts/${testPost._id}`)
       .set('Authorization', `Bearer ${otherAccessToken}`)
-      .expect(200); // ה-API לא בודק בעלות ומחזיר 200 תמיד
+      .expect(403);
 
     // הפוסט עדיין קיים בדאטאבייס
     const post = await Post.findById(testPost._id);
@@ -119,16 +121,23 @@ describe('Delete Post API', () => {
   test('should return 404 if post does not exist', async () => {
     const nonExistentId = new mongoose.Types.ObjectId();
 
+    // שינוי הציפייה ל-404 במקום 200
     const response = await request(app)
       .delete(`/api/posts/${nonExistentId}`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .expect(200); // ה-API מחזיר 200 גם כאשר הפוסט לא קיים
+      .expect(404);
+      
+    expect(response.body).toHaveProperty('message');
+    expect(response.body.message).toContain('not found');
   });
 
   test('should handle invalid post ID format', async () => {
+    // שינוי הציפייה ל-500 במקום 200 עבור ID לא תקין
     const response = await request(app)
       .delete('/api/posts/invalid-id')
       .set('Authorization', `Bearer ${accessToken}`)
-      .expect(200); // ה-API מחזיר 200 גם עבור מזהה פוסט לא תקין
+      .expect(500);
+      
+    expect(response.body).toHaveProperty('message');
   });
 }); 

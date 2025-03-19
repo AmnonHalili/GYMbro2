@@ -2,7 +2,7 @@ import express from 'express';
 import { body } from 'express-validator';
 import * as postController from '../controllers/postController';
 import { authenticateToken } from '../middleware/auth';
-import { uploadPostImage } from '../middleware/upload';
+import { uploadPostImage, verifyUploadedFile, checkFormDataContent, debugSavedFile } from '../middleware/upload';
 import { validate } from '../middleware/validation';
 import { Request, Response, NextFunction } from 'express';
 
@@ -268,7 +268,10 @@ router.get('/trending', postController.getTrendingPosts);
 router.post(
   '/',
   authenticateToken,
+  checkFormDataContent,
   uploadPostImage,
+  debugSavedFile,
+  verifyUploadedFile,
   validate(postValidation),
   asyncWrapper(postController.createPost)
 );

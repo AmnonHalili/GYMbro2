@@ -653,6 +653,93 @@
   margin-top: 1rem;
 }
 
+/* Nutrition Calculator Additional Styling */
+.nutrition-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: var(--light-bg);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.nutrition-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.nutrition-row:last-child {
+  border-bottom: none;
+}
+
+.nutrition-row.nutrition-section {
+  margin-top: 0.5rem;
+  border-top: 2px solid rgba(46, 204, 113, 0.3);
+  padding-top: 1rem;
+}
+
+.nutrition-row.alert-info {
+  background-color: rgba(41, 128, 185, 0.1);
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+
+.nutrition-label {
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.nutrition-value {
+  color: var(--primary-dark);
+  font-weight: 500;
+}
+
+/* סגנון עבור ויטמינים ומינרלים */
+.nutrition-section .nutrition-value {
+  font-size: 0.9rem;
+  max-width: 80%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  text-align: left;
+}
+
+/* סגנון עבור אלרגיות */
+.alert-info .nutrition-label {
+  color: #31708f;
+}
+
+.alert-info .nutrition-value {
+  color: #31708f;
+  font-weight: 600;
+}
+
+/* סגנון למידע גולמי */
+.raw-data-container {
+  margin-top: 1.5rem;
+  border-top: 1px dashed var(--light-border);
+  padding-top: 1rem;
+  text-align: center;
+}
+
+.raw-data {
+  max-height: 200px;
+  overflow-y: auto;
+  direction: ltr; /* שינוי כיוון לטקסט באנגלית */
+  text-align: left;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.raw-data pre {
+  font-family: monospace;
+  margin-bottom: 0;
+}
+
 /* Nutrition Advisor Additional Styling */
 @media (max-width: 768px) {
   .diet-options-container,
@@ -662,5 +749,9 @@
   
   .number-input-container {
     max-width: 100%;
+  }
+  
+  .nutrition-section .nutrition-value {
+    max-width: 60%;
   }
 } 

@@ -49,16 +49,16 @@ describe('Like Tests', () => {
       .post(`/api/likes/post/${postId}`)
       .set('Authorization', `Bearer ${accessToken}`);
 
-    // Expecting 403 status code based on current implementation
-    expect(response.status).toBe(403);
+    // השרת מחזיר 200 במקום 403
+    expect(response.status).toBe(200);
     
     // וידוא שהלייק נשמר במסד הנתונים
     const like = await Like.findOne({ post: postId, user: userId });
-    expect(like).toBeNull();
+    expect(like).not.toBeNull();
     
     // וידוא שמספר הלייקים עודכן בפוסט
     const post = await Post.findById(postId);
-    expect(post?.likesCount).toBe(0);
+    expect(post?.likesCount).toBe(1);
   });
 
   // בדיקת הסרת לייק (toggle)
@@ -68,16 +68,20 @@ describe('Like Tests', () => {
       .post(`/api/likes/post/${postId}`)
       .set('Authorization', `Bearer ${accessToken}`);
     
+    // וידוא שהלייק נשמר
+    let like = await Like.findOne({ post: postId, user: userId });
+    expect(like).not.toBeNull();
+    
     // הסרת הלייק באמצעות toggle
     const response = await request(app)
       .post(`/api/likes/post/${postId}`)
       .set('Authorization', `Bearer ${accessToken}`);
 
-    // Expecting 403 status code based on current implementation
-    expect(response.status).toBe(403);
+    // השרת מחזיר 200 במקום 403
+    expect(response.status).toBe(200);
     
     // וידוא שהלייק הוסר ממסד הנתונים
-    const like = await Like.findOne({ post: postId, user: userId });
+    like = await Like.findOne({ post: postId, user: userId });
     expect(like).toBeNull();
     
     // וידוא שמספר הלייקים עודכן בפוסט
@@ -92,7 +96,9 @@ describe('Like Tests', () => {
       .get(`/api/likes/post/${postId}/check`)
       .set('Authorization', `Bearer ${accessToken}`);
 
-    expect(response.status).toBe(403);
+    // השרת מחזיר 200 במקום 403
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('liked', false);
     
     // הוספת לייק
     await request(app)
@@ -104,6 +110,8 @@ describe('Like Tests', () => {
       .get(`/api/likes/post/${postId}/check`)
       .set('Authorization', `Bearer ${accessToken}`);
 
-    expect(response.status).toBe(403);
+    // השרת מחזיר 200 במקום 403
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('liked', true);
   });
 }); 

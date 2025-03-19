@@ -13,10 +13,20 @@ const NutritionalCalculator: React.FC = () => {
     protein: string;
     carbs: string;
     fat: string;
+    saturatedFat?: string;
+    fiber?: string;
+    sugars?: string;
+    sodium?: string;
+    cholesterol?: string;
+    vitamins?: string[] | string;
+    minerals?: string[] | string;
+    allergies?: string[] | string;
+    rawText?: string;
     [key: string]: any;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRawData, setShowRawData] = useState(false);
   
   // Add food item to the list
   const handleAddFood = () => {
@@ -40,8 +50,28 @@ const NutritionalCalculator: React.FC = () => {
     
     try {
       const request: NutritionalValuesRequest = { foodItems };
+      console.log('[NutritionalCalculator] Sending request with food items:', request.foodItems.join(", "));
+      
       const response = await aiService.calculateNutrition(request.foodItems.join(", "));
-      setNutritionalValues(response.nutritionalValues);
+      console.log('[NutritionalCalculator] Received response:', response);
+      
+      // וידוא שקיים אובייקט nutritionalValues ושהוא לא ריק
+      if (response && response.nutritionalValues && Object.keys(response.nutritionalValues).length > 0) {
+        setNutritionalValues(response.nutritionalValues);
+      } else if (response && response.nutritionInfo && Object.keys(response.nutritionInfo).length > 0) {
+        // גיבוי למקרה שמוחזר רק nutritionInfo
+        setNutritionalValues(response.nutritionInfo);
+      } else {
+        console.warn('[NutritionalCalculator] API returned empty or invalid response:', response);
+        setError('לא התקבלו ערכים תזונתיים מהשרת. נסה לשנות את תיאור המזון או נסה שוב מאוחר יותר.');
+        // אובייקט ריק שתואם את המבנה המצופה
+        setNutritionalValues({
+          calories: 0,
+          protein: "0g",
+          carbs: "0g",
+          fat: "0g"
+        });
+      }
       
       // בעת קבלת תוצאות חדשות, נגלול אוטומטית לחלק התוצאות
       setTimeout(() => {
@@ -51,8 +81,9 @@ const NutritionalCalculator: React.FC = () => {
         }
       }, 200);
     } catch (error: any) {
-      console.error('Error calculating nutritional values:', error);
+      console.error('[NutritionalCalculator] Error calculating nutritional values:', error);
       setError(error.message || 'אירעה שגיאה בעת חישוב הערכים התזונתיים');
+      setNutritionalValues(null);
     } finally {
       setLoading(false);
     }
@@ -178,10 +209,136 @@ const NutritionalCalculator: React.FC = () => {
       </div>
       
       {nutritionalValues && (
-        <div className="ai-result">
+        <div className="ai-result" id="nutrition-results">
           <h3>ערכים תזונתיים</h3>
           <div className="nutritional-values">
-            <pre>{JSON.stringify(nutritionalValues)}</pre>
+            {Object.keys(nutritionalValues).length === 0 ? (
+              <p className="text-warning">לא נמצאו ערכים תזונתיים עבור המזונות שהוזנו.</p>
+            ) : (
+              <div className="nutrition-table">
+                {nutritionalValues.calories && (
+                  <div className="nutrition-row">
+                    <div className="nutrition-label">קלוריות:</div>
+                    <div className="nutrition-value">{nutritionalValues.calories}</div>
+                  </div>
+                )}
+                {nutritionalValues.protein && (
+                  <div className="nutrition-row">
+                    <div className="nutrition-label">חלבון:</div>
+                    <div className="nutrition-value">{nutritionalValues.protein}</div>
+                  </div>
+                )}
+                {nutritionalValues.carbs && (
+                  <div className="nutrition-row">
+                    <div className="nutrition-label">פחמימות:</div>
+                    <div className="nutrition-value">{nutritionalValues.carbs}</div>
+                  </div>
+                )}
+                {nutritionalValues.fat && (
+                  <div className="nutrition-row">
+                    <div className="nutrition-label">שומן:</div>
+                    <div className="nutrition-value">{nutritionalValues.fat}</div>
+                  </div>
+                )}
+                {nutritionalValues.saturatedFat && (
+                  <div className="nutrition-row">
+                    <div className="nutrition-label">שומן רווי:</div>
+                    <div className="nutrition-value">{nutritionalValues.saturatedFat}</div>
+                  </div>
+                )}
+                {nutritionalValues.fiber && (
+                  <div className="nutrition-row">
+                    <div className="nutrition-label">סיבים תזונתיים:</div>
+                    <div className="nutrition-value">{nutritionalValues.fiber}</div>
+                  </div>
+                )}
+                {nutritionalValues.sugars && (
+                  <div className="nutrition-row">
+                    <div className="nutrition-label">סוכרים:</div>
+                    <div className="nutrition-value">{nutritionalValues.sugars}</div>
+                  </div>
+                )}
+                {nutritionalValues.sodium && (
+                  <div className="nutrition-row">
+                    <div className="nutrition-label">נתרן:</div>
+                    <div className="nutrition-value">{nutritionalValues.sodium}</div>
+                  </div>
+                )}
+                {nutritionalValues.cholesterol && (
+                  <div className="nutrition-row">
+                    <div className="nutrition-label">כולסטרול:</div>
+                    <div className="nutrition-value">{nutritionalValues.cholesterol}</div>
+                  </div>
+                )}
+                
+                {/* הצגת ויטמינים אם קיימים */}
+                {nutritionalValues.vitamins && (
+                  <div className="nutrition-row nutrition-section">
+                    <div className="nutrition-label">ויטמינים:</div>
+                    <div className="nutrition-value">
+                      {Array.isArray(nutritionalValues.vitamins) 
+                        ? nutritionalValues.vitamins.join(', ')
+                        : nutritionalValues.vitamins}
+                    </div>
+                  </div>
+                )}
+                
+                {/* הצגת מינרלים אם קיימים */}
+                {nutritionalValues.minerals && (
+                  <div className="nutrition-row nutrition-section">
+                    <div className="nutrition-label">מינרלים:</div>
+                    <div className="nutrition-value">
+                      {Array.isArray(nutritionalValues.minerals) 
+                        ? nutritionalValues.minerals.join(', ')
+                        : nutritionalValues.minerals}
+                    </div>
+                  </div>
+                )}
+                
+                {/* הצגת אלרגיות אם קיימות */}
+                {nutritionalValues.allergies && (
+                  <div className="nutrition-row nutrition-section alert-info">
+                    <div className="nutrition-label">אלרגיות:</div>
+                    <div className="nutrition-value">
+                      {Array.isArray(nutritionalValues.allergies) 
+                        ? nutritionalValues.allergies.join(', ')
+                        : nutritionalValues.allergies}
+                    </div>
+                  </div>
+                )}
+                
+                {/* הצגת ערכים נוספים אם קיימים */}
+                {Object.entries(nutritionalValues)
+                  .filter(([key]) => !['calories', 'protein', 'carbs', 'fat', 'fiber', 
+                                       'saturatedFat', 'sugars', 'sodium', 'cholesterol', 
+                                       'vitamins', 'minerals', 'allergies', 'rawText'].includes(key))
+                  .map(([key, value]) => (
+                    <div className="nutrition-row" key={key}>
+                      <div className="nutrition-label">{key}:</div>
+                      <div className="nutrition-value">{value}</div>
+                    </div>
+                  ))
+                }
+                
+                {/* הצגת הטקסט הגולמי אם קיים */}
+                {nutritionalValues.rawText && (
+                  <div className="raw-data-container">
+                    <button 
+                      className="btn btn-sm btn-outline-secondary mt-3"
+                      onClick={() => setShowRawData(!showRawData)}
+                    >
+                      {showRawData ? 'הסתר מידע גולמי' : 'הצג מידע גולמי מלא'}
+                    </button>
+                    
+                    {showRawData && (
+                      <div className="raw-data mt-2 p-3 bg-light rounded">
+                        <pre className="mb-0">{nutritionalValues.rawText}</pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="result-disclaimer">
             <p className="text-muted small">

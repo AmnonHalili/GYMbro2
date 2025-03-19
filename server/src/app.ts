@@ -205,9 +205,9 @@ imageCheckRouter.get('/:folder/:filename', asyncWrapper(async (req: Request, res
   }
 }));
 
-// רגיסטור הראוטר לאפליקציה
-app.use('/image', imageRouter);
+// רישום כל נתיבי ה-API תחת הקידומת /api/
 app.use('/api/check-image', imageCheckRouter);
+app.use('/api/image', imageRouter);
 
 // אנדפוינט לתיקון תמונות ריקות
 app.post('/api/fix-empty-images', asyncWrapper(async (req: Request, res: Response) => {
@@ -219,7 +219,7 @@ app.post('/api/fix-empty-images', asyncWrapper(async (req: Request, res: Respons
   });
 }));
 
-// הוספת אנדפוינט לבדיקת נתיבי תמונות שנשמרו במערכת
+// אנדפוינט חדש ומאוחד לבדיקת נתיבי תמונות
 app.get('/api/debug/image-path', (req: Request, res: Response) => {
   // בדיקת הנתיבים האבסולוטיים של תיקיות התמונות
   const paths = {
@@ -240,7 +240,7 @@ app.get('/api/debug/image-path', (req: Request, res: Response) => {
   res.json(paths);
 });
 
-// הוספת אנדפוינט לשליפת קבצי התמונות בתיקייה
+// אנדפוינט לשליפת קבצי התמונות בתיקייה
 app.get('/api/debug/list-images', async function(req: Request, res: Response): Promise<void> {
   try {
     const postsPath = path.join(__dirname, '../uploads/posts');
@@ -277,6 +277,151 @@ app.get('/api/debug/list-images', async function(req: Request, res: Response): P
   }
 });
 
+// Static files - הגדרה אחת מאוחדת במקום שתיים
+app.use('/uploads', (req, res, next) => {
+  // Debug request
+  console.log(`[StaticFiles] Request for: ${req.url}`, {
+    fullPath: path.join(__dirname, '../uploads', req.url),
+    exists: fs.existsSync(path.join(__dirname, '../uploads', req.url))
+  });
+  
+  // Set headers for CORS and caching
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Access-Control-Allow-Origin', '*');
+  next();
+}, express.static(path.join(__dirname, '../uploads'), {
+  maxAge: '1d',
+  etag: true,
+  lastModified: true
+}));
+
+// Log upload dirs and permissions
+const printUploadsPermissions = () => {
+  const uploadDirs = [
+    path.join(__dirname, '../uploads'), 
+    path.join(__dirname, '../uploads/posts'),
+    path.join(__dirname, '../uploads/profile')
+  ];
+  
+  uploadDirs.forEach(dir => {
+    try {
+      const stats = fs.statSync(dir);
+      const permissions = '0' + (stats.mode & parseInt('777', 8)).toString(8);
+      console.log(`Directory ${dir} permissions: ${permissions}`);
+      
+      // Check for some files
+      if (fs.existsSync(dir)) {
+        const files = fs.readdirSync(dir);
+        console.log(`Files in ${dir}: ${files.length > 0 ? files.slice(0, 5).join(', ') : 'none'}`);
+      }
+    } catch (err) {
+      console.error(`Error checking ${dir}:`, err);
+    }
+  });
+};
+
+printUploadsPermissions();
+
+// API route handler for checking images - מטפל ב-API prefix
+app.get('/api/check-image/:folder/:filename', asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+  const { folder, filename } = req.params;
+  
+  // Log request
+  console.log(`[API Check Image] Request for ${folder}/${filename}`);
+  
+  // Handle URL encoding - decode the filename  
+  const decodedFilename = decodeURIComponent(filename);
+  console.log(`[API Check Image] Decoded filename: ${decodedFilename}`);
+  
+  // Validate folder
+  if (!['posts', 'profile'].includes(folder)) {
+    res.status(400).json({ 
+      exists: false, 
+      error: 'Invalid folder', 
+      message: 'Folder must be either "posts" or "profile"'
+    });
+    return;
+  }
+  
+  // Build file path
+  const imagePath = path.join(__dirname, '../uploads', folder, decodedFilename);
+  console.log(`[API Check Image] Looking for file at: ${imagePath}`);
+  
+  try {
+    // Check if file exists with exact name
+    let fileExists = fs.existsSync(imagePath);
+    let finalPath = imagePath;
+    
+    // If not found, try to find file with timestamp prefix
+    if (!fileExists) {
+      console.log(`[API Check Image] File not found with exact name, checking for timestamp version`);
+      
+      const dir = path.join(__dirname, '../uploads', folder);
+      if (fs.existsSync(dir)) {
+        const files = fs.readdirSync(dir);
+        // Find any file ending with the requested filename (ignoring timestamp prefix)
+        const matchingFile = files.find(file => file.includes('_' + decodedFilename));
+        
+        if (matchingFile) {
+          finalPath = path.join(dir, matchingFile);
+          fileExists = true;
+          console.log(`[API Check Image] Found matching file: ${matchingFile}`);
+        }
+      }
+    }
+    
+    if (!fileExists) {
+      console.log(`[API Check Image] File not found: ${imagePath}`);
+      res.status(404).json({
+        exists: false,
+        error: 'Not found',
+        message: 'Image does not exist'
+      });
+      return;
+    }
+    
+    // Check file stats
+    const stats = fs.statSync(finalPath);
+    if (stats.size === 0) {
+      console.log(`[API Check Image] Empty file: ${finalPath}`);
+      res.status(400).json({
+        exists: true,
+        error: 'Empty file',
+        message: 'Image file exists but is empty (0 bytes)'
+      });
+      return;
+    }
+    
+    // Get the filename from the path for the URL
+    const actualFilename = path.basename(finalPath);
+    
+    // Get image URL
+    const serverBaseUrl = getServerBaseUrl();
+    const imageUrl = `${serverBaseUrl}/uploads/${folder}/${actualFilename}`;
+    
+    console.log(`[API Check Image] Success:`, {
+      path: finalPath,
+      size: stats.size,
+      url: imageUrl
+    });
+    
+    res.status(200).json({
+      exists: true,
+      size: stats.size,
+      created: stats.birthtime,
+      url: imageUrl,
+      path: `/uploads/${folder}/${actualFilename}`
+    });
+  } catch (error: any) {
+    console.error(`[API Check Image] Error:`, error);
+    res.status(500).json({
+      exists: false,
+      error: 'Error checking file',
+      message: error.message
+    });
+  }
+}));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
@@ -290,8 +435,11 @@ app.use(errorHandler);
 
 // Get the server's base URL from environment or build it
 const getServerBaseUrl = (): string => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
   const host = process.env.HOST || 'localhost';
-  const port = process.env.PORT || '3000';
+  const port = process.env.PORT || '5000';
   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
   return `${protocol}://${host}:${port}`;
 };

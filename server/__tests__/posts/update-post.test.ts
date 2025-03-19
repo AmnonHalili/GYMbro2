@@ -69,9 +69,10 @@ describe('Update Post API', () => {
       .send(updateData);
 
     expect(response.status).toBe(200);
-    expect(response.body).toHaveProperty('_id');
-    expect(response.body.content).toBe(updateData.content);
-    expect(response.body.user._id).toBe(testUser._id.toString());
+    expect(response.body).toHaveProperty('post');
+    expect(response.body.post).toHaveProperty('_id');
+    expect(response.body.post.content).toBe(updateData.content);
+    expect(response.body.post.user._id).toBe(testUser._id.toString());
 
     // Verify post was updated in the database
     const updatedPost = await Post.findById(testPost._id);
@@ -105,7 +106,7 @@ describe('Update Post API', () => {
 
     expect(response.status).toBe(403);
     expect(response.body).toHaveProperty('message');
-    expect(response.body.message).toContain('Not authorized');
+    expect(response.body.message).toContain('You can only update your own posts');
   });
 
   test('should return 400 if content is missing', async () => {

@@ -240,8 +240,38 @@ export const calculateNutrition = async (req: Request, res: Response): Promise<v
     // Call AI API for nutrition calculation
     const aiResponse = await callAI({
       prompt: `Provide detailed nutritional information for "${food}" in JSON format. 
-              Include calories, protein, carbs, fat, fiber, vitamins, and minerals.
-              Format the response as a structured JSON object.`
+              Include the following values:
+              - calories (number, no units)
+              - protein (string, in grams, e.g. "20g")
+              - carbs (string, in grams)
+              - fat (string, in grams)
+              - saturatedFat (string, in grams)
+              - fiber (string, in grams)
+              - sugars (string, in grams)
+              - sodium (string, in mg)
+              - cholesterol (string, in mg)
+              - vitamins (array of strings or string with description)
+              - minerals (array of strings or string with description)
+              - allergies (array of strings of potential allergens found in the food)
+              
+              Format the response as a structured JSON object with all these exact field names.
+              For example:
+              {
+                "calories": 165,
+                "protein": "31g",
+                "carbs": "0g",
+                "fat": "3.6g",
+                "saturatedFat": "1g",
+                "fiber": "0g",
+                "sugars": "0g",
+                "sodium": "74mg",
+                "cholesterol": "85mg",
+                "vitamins": ["Vitamin B6: 0.6mg", "Vitamin B12: 0.3µg"],
+                "minerals": ["Zinc: 0.9mg", "Phosphorus: 196mg"],
+                "allergies": []
+              }
+              
+              If any values are not available or not applicable, use null or empty arrays.`
     });
     
     // Format the response
