@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import * as postService from '../services/postService';
 import AnonymousAvatar from './AnonymousAvatar';
+import { getImageUrl } from '../services/api';
 
 interface PostCardProps {
   post: Post;
@@ -179,26 +180,38 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostDeleted }) => {
     }
   };
   
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, postId: string) => {
+    const img = e.currentTarget;
+    console.error(`[PostCard] Failed to load image for post ${postId}, url: ${img.src}`);
+    
+    // מסתיר את התמונה אם לא נטענה
+    img.style.display = 'none';
+    
+    // הסתרת הקונטיינר של התמונה במקרה של כשל בטעינה
+    const container = img.parentElement;
+    if (container) {
+      container.style.display = 'none';
+    }
+  };
+
+  // בונה URL לתמונה בשימוש הפונקציה המשופרת
+  const buildImageUrl = (imagePath: string | null): string => {
+    if (!imagePath) return '';
+    
+    // שימוש בפונקציה שנוספה ל-API
+    return getImageUrl(imagePath);
+  };
+
   return (
     <div className="post-card card h-100 shadow-sm animate-fade-in" onClick={() => navigate(`/post/${postId}`)}>
       {post.image && (
         <div className="post-image-container">
           <img 
-            src={post.image} 
+            src={buildImageUrl(post.image)}
             className="card-img-top" 
             alt="תמונת פוסט"
             loading="lazy"
-            onError={(e) => {
-              console.error(`Failed to load image for post ${postId}:`, post.image);
-              // Set a fallback or hide the image container if loading fails
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              // Find parent container and hide it too
-              const container = target.closest('.post-image-container');
-              if (container) {
-                (container as HTMLElement).style.display = 'none';
-              }
-            }}
+            onError={(e) => handleImageError(e, postId)}
           />
         </div>
       )}

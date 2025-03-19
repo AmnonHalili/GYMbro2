@@ -314,16 +314,16 @@ router.get('/:postId', asyncWrapper(postController.getPostById));
 
 /**
  * @swagger
- * /api/posts/{postId}:
+ * /api/posts/{id}:
  *   put:
  *     summary: Update a post
- *     description: Update the content of an existing post.
+ *     description: Update an existing post's content and/or image.
  *     tags: [Posts]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: postId
+ *         name: id
  *         required: true
  *         schema:
  *           type: string
@@ -331,7 +331,7 @@ router.get('/:postId', asyncWrapper(postController.getPostById));
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required:
@@ -340,7 +340,14 @@ router.get('/:postId', asyncWrapper(postController.getPostById));
  *               content:
  *                 type: string
  *                 description: Updated post content
- *                 example: Updated my workout routine today! 💪
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: New image (optional)
+ *               removeImage:
+ *                 type: string
+ *                 enum: ["true", "false"]
+ *                 description: Set to "true" to remove the existing image without adding a new one
  *     responses:
  *       200:
  *         description: Post updated successfully
@@ -351,40 +358,24 @@ router.get('/:postId', asyncWrapper(postController.getPostById));
  *               properties:
  *                 post:
  *                   $ref: '#/components/schemas/Post'
+ *                 message:
+ *                   type: string
+ *                   example: Post updated successfully
  *       400:
  *         description: Validation error in request data
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
  *       401:
  *         description: Unauthorized, authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
  *       403:
- *         description: Forbidden, user is not the post owner
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         description: Forbidden, user not authorized to update this post
  *       404:
  *         description: Post not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
  *       500:
  *         description: Server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
  */
 router.put(
-  '/:postId',
+  '/:id',
   authenticateToken,
+  uploadPostImage,
   validate(postValidation),
   asyncWrapper(postController.updatePost)
 );

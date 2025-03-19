@@ -10,6 +10,7 @@ import YAML from 'yamljs';
 import apiRoutes from './routes';
 import passport from 'passport';
 import './config/passport';
+import fs from 'fs';
 
 // Load environment variables
 dotenv.config();
@@ -31,8 +32,45 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 app.use(passport.initialize());
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Helper function to verify uploads directory
+const verifyUploadsDirectory = () => {
+  const uploadsPath = path.join(__dirname, '../uploads');
+  console.log('[Server] Checking uploads directory:', uploadsPath);
+  
+  if (!fs.existsSync(uploadsPath)) {
+    console.error('[Server] CRITICAL ERROR: Uploads directory does not exist!');
+    fs.mkdirSync(uploadsPath, { recursive: true });
+    console.log('[Server] Created missing uploads directory');
+  } else {
+    console.log('[Server] Uploads directory exists');
+    
+    // Check posts directory
+    const postsPath = path.join(uploadsPath, 'posts');
+    if (!fs.existsSync(postsPath)) {
+      console.error('[Server] Posts directory does not exist!');
+      fs.mkdirSync(postsPath, { recursive: true });
+      console.log('[Server] Created missing posts directory');
+    } else {
+      // List some files to verify content
+      try {
+        const files = fs.readdirSync(postsPath);
+        console.log(`[Server] Found ${files.length} files in posts directory`);
+        if (files.length > 0) {
+          console.log('[Server] Sample files:', files.slice(0, 5));
+        }
+      } catch (err) {
+        console.error('[Server] Error reading posts directory:', err);
+      }
+    }
+  }
+  
+  return uploadsPath;
+};
+
+// Serve uploaded files with improved logging
+const uploadsDir = verifyUploadsDirectory();
+app.use('/uploads', express.static(uploadsDir));
+console.log(`[Server] Static files middleware configured for path: ${uploadsDir}`);
 
 // API routes
 app.get('/', (req: Request, res: Response) => {

@@ -107,8 +107,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       
       if (!accessToken) {
-        console.warn('No access token found in localStorage');
-        dispatch({ type: 'AUTH_ERROR', payload: 'No token found' });
+        console.log('No access token found in localStorage - normal for new or logged out users');
+        dispatch({ 
+          type: 'AUTH_ERROR', 
+          payload: ''
+        });
         return;
       }
       
@@ -130,8 +133,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const accessToken = localStorage.getItem('accessToken');
       
       if (!accessToken) {
-        console.warn('No access token available when attempting to load user');
-        dispatch({ type: 'AUTH_ERROR', payload: 'No token found' });
+        console.log('No access token available when attempting to load user - normal during login/register flow');
+        dispatch({ 
+          type: 'AUTH_ERROR', 
+          payload: ''
+        });
         return;
       }
       

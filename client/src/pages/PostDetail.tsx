@@ -235,31 +235,72 @@ const PostDetail: React.FC = () => {
         // Fetch post
         const postData = await postService.getPostById(postId, 5);
         
-        if (postData && postData.data) {
-          setPost(postData.data);
-        } else if (postData) {
-          setPost(postData as unknown as Post);
-        } else {
-          throw new Error('Invalid post data format');
+        let postObj: Post | null = null;
+        
+        // נסיון למצוא את אובייקט הפוסט ממספר מבנים אפשריים בתגובה
+        if (postData.data && typeof postData.data === 'object') {
+          console.log('Post found in postData.data');
+          postObj = postData.data as Post;
+        } else if (postData.post && typeof postData.post === 'object') {
+          console.log('Post found in postData.post');
+          postObj = postData.post as Post;
+        } else if (postData && typeof postData === 'object' && (postData as any).content) {
+          console.log('Post found directly in postData');
+          postObj = postData as unknown as Post;
         }
         
+        if (!postObj) {
+          console.error('Could not find valid post object in API response:', postData);
+          throw new Error('לא נמצאו נתוני פוסט תקינים');
+        }
+        
+        // וידוא שהפוסט מכיל את כל השדות הנדרשים
+        if (!postObj.user || typeof postObj.user !== 'object') {
+          console.warn('Post has no user object, creating placeholder');
+          postObj.user = {
+            id: 'unknown',
+            _id: 'unknown',
+            username: 'משתמש'
+          };
+        }
+        
+        // וידוא שלפוסט יש מזהה
+        if (!postObj.id && (postObj as any)._id) {
+          postObj.id = (postObj as any)._id;
+        }
+        
+        console.log('Processed post object:', {
+          id: postObj.id,
+          content: postObj.content?.substring(0, 30),
+          user: postObj.user ? {
+            id: postObj.user.id || postObj.user._id,
+            username: postObj.user.username
+          } : 'No user'
+        });
+        
+        setPost(postObj);
+        
         // Fetch comments
-        const commentsData = await postService.getCommentsByPost(postId);
-        if (commentsData) {
-          setComments(commentsData.comments || []);
-          if (commentsData.pagination) {
-            setPagination(commentsData.pagination);
+        try {
+          const commentsData = await postService.getCommentsByPost(postId);
+          if (commentsData) {
+            setComments(commentsData.comments || []);
+            if (commentsData.pagination) {
+              setPagination(commentsData.pagination);
+            }
           }
+        } catch (commentError) {
+          console.error('Error fetching comments:', commentError);
+          // עדיין נציג את הפוסט אפילו אם טעינת התגובות נכשלה
         }
       } catch (error) {
-        console.error('Error fetching post data:', error);
-        setError('אירעה שגיאה בטעינת הפוסט. אנא נסה שוב מאוחר יותר.');
-        toast.error('לא ניתן לטעון את נתוני הפוסט כרגע');
+        console.error('Error fetching post:', error);
+        setError(typeof error === 'string' ? error : 'אירעה שגיאה בטעינת הפוסט');
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchPostAndComments();
   }, [postId]);
   
@@ -555,22 +596,26 @@ const PostDetail: React.FC = () => {
         <div className="post-detail">
           <div className="post-detail-content">
             <div className="post-detail-user">
-              <Link to={`/profile/${post.user?._id || post.user?.id}`}>
-                {post.user?.profilePicture ? (
-                  <img 
-                    src={post.user.profilePicture} 
-                    alt={post.user?.username || 'משתמש'} 
-                    className="post-avatar"
-                  />
-                ) : (
-                  <AnonymousAvatar size="md" className="post-avatar" />
-                )}
-              </Link>
+              {post.user && (
+                <Link to={`/profile/${post.user?._id || post.user?.id}`}>
+                  {post.user?.profilePicture ? (
+                    <img 
+                      src={post.user.profilePicture} 
+                      alt={post.user?.username || 'משתמש'} 
+                      className="post-avatar"
+                    />
+                  ) : (
+                    <AnonymousAvatar size="md" className="post-avatar" />
+                  )}
+                </Link>
+              )}
               
               <div>
-                <Link to={`/profile/${post.user?._id || post.user?.id}`} className="post-username">
-                  {post.user?.username || 'משתמש אנונימי'}
-                </Link>
+                {post.user && (
+                  <Link to={`/profile/${post.user?._id || post.user?.id}`} className="post-username">
+                    {post.user?.username || 'משתמש'}
+                  </Link>
+                )}
                 <span className="post-date">
                   {post.createdAt ? formatFullDate(post.createdAt) : ''}
                 </span>

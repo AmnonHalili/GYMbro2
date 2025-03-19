@@ -53,33 +53,108 @@ const CreatePost: React.FC = () => {
     }
   };
   
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files[0]) {
-      const selectedFile = files[0];
-      
-      // בדיקה שהקובץ הוא תמונה
-      if (!selectedFile.type.match('image.*')) {
-        setError('יש להעלות קובץ תמונה בלבד');
-        return;
-      }
-      
-      // בדיקת גודל קובץ (מקסימום 5MB)
-      if (selectedFile.size > 5 * 1024 * 1024) {
-        setError('גודל התמונה לא יכול לעלות על 5MB');
-        return;
-      }
-      
-      setImage(selectedFile);
-      
-      // יצירת תצוגה מקדימה של התמונה
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(selectedFile);
-      
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
       setError(null);
+      setImage(null);
+      setImagePreview(null);
+      return;
+    }
+    
+    console.log(`[CreatePost] File selected: ${file.name}, Size: ${file.size} bytes, Type: ${file.type}`);
+    
+    // בדיקה שהקובץ אינו ריק
+    if (file.size === 0) {
+      setError('קובץ התמונה ריק. אנא בחר תמונה תקינה.');
+      setImage(null);
+      setImagePreview(null);
+      // ניקוי שדה הקובץ
+      e.target.value = '';
+      return;
+    }
+    
+    // בדיקת סוג התמונה
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError('סוג הקובץ אינו נתמך. אנא בחר תמונה מסוג JPEG, PNG, GIF או WebP.');
+      setImage(null);
+      setImagePreview(null);
+      // ניקוי שדה הקובץ
+      e.target.value = '';
+      return;
+    }
+    
+    // בדיקת גודל קובץ מקסימלי
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_FILE_SIZE) {
+      setError(`גודל הקובץ חורג מהמותר. גודל מקסימלי הוא ${MAX_FILE_SIZE / (1024 * 1024)}MB.`);
+      setImage(null);
+      setImagePreview(null);
+      // ניקוי שדה הקובץ
+      e.target.value = '';
+      return;
+    }
+    
+    // קריאת תוכן הקובץ לוידוא שהוא תקין לפני הצגתו
+    const reader = new FileReader();
+    
+    reader.onerror = () => {
+      console.error('[CreatePost] Error reading file:', reader.error);
+      setError('שגיאה בקריאת הקובץ. אנא נסה קובץ אחר.');
+      setImage(null);
+      setImagePreview(null);
+      // ניקוי שדה הקובץ
+      e.target.value = '';
+    };
+    
+    reader.onabort = () => {
+      console.error('[CreatePost] File reading aborted');
+      setError('קריאת הקובץ הופסקה. אנא נסה שוב.');
+    };
+    
+    reader.onloadend = () => {
+      // בדיקה שיש תוצאת קריאה
+      if (typeof reader.result !== 'string' || reader.result.length === 0) {
+        console.error('[CreatePost] File read result is empty or invalid');
+        setError('לא ניתן לקרוא את תוכן הקובץ. אנא נסה קובץ אחר.');
+        setImage(null);
+        setImagePreview(null);
+        return;
+      }
+      
+      // בדיקה שהתמונה מוצגת כראוי
+      const img = new Image();
+      img.onload = () => {
+        // התמונה נטענה בהצלחה - משמע קובץ תקין
+        console.log(`[CreatePost] Image loaded successfully: ${img.width}x${img.height}`);
+        // שמירת התמונה במצב המקומי
+        setImage(file);
+        setImagePreview(reader.result as string);
+        setError(null);
+      };
+      
+      img.onerror = () => {
+        console.error('[CreatePost] Error loading image');
+        setError('קובץ התמונה שנבחר אינו תקין. אנא בחר תמונה אחרת.');
+        setImage(null);
+        setImagePreview(null);
+        // ניקוי שדה הקובץ
+        e.target.value = '';
+      };
+      
+      // טעינת התמונה לבדיקה
+      img.src = reader.result as string;
+    };
+    
+    // בדיקה נוספת לפני קריאת הקובץ
+    if (file.size > 0) {
+      reader.readAsDataURL(file);
+    } else {
+      console.error('[CreatePost] Attempted to read an empty file');
+      setError('קובץ התמונה ריק. אנא בחר תמונה תקינה.');
+      // ניקוי שדה הקובץ
+      e.target.value = '';
     }
   };
   
@@ -109,6 +184,28 @@ const CreatePost: React.FC = () => {
       return;
     }
     
+    // בדיקה נוספת שהתמונה שנבחרה תקינה (אם קיימת)
+    if (image) {
+      if (image.size === 0) {
+        setError('התמונה שנבחרה אינה תקינה. אנא בחר תמונה אחרת או הסר אותה.');
+        return;
+      }
+      
+      // בדיקת סוג קובץ
+      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!validTypes.includes(image.type)) {
+        setError('סוג התמונה אינו נתמך. אנא בחר תמונה מסוג JPEG, PNG, GIF או WebP.');
+        return;
+      }
+      
+      // בדיקת גודל מקסימלי
+      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+      if (image.size > MAX_FILE_SIZE) {
+        setError(`גודל התמונה חורג מהמותר. גודל מקסימלי הוא ${MAX_FILE_SIZE / (1024 * 1024)}MB.`);
+        return;
+      }
+    }
+    
     setIsSubmitting(true);
     setError(null);
     
@@ -124,11 +221,49 @@ const CreatePost: React.FC = () => {
     
     try {
       console.log('[CreatePost] Starting post creation...');
+      
+      // יצירת FormData ושימוש בו לשליחת מידע הפוסט והקובץ
       const formData = new FormData();
+      
+      // הוספת תוכן הפוסט
       formData.append('content', content);
       
-      if (image) {
-        formData.append('image', image);
+      // הוספת התמונה רק אם היא קיימת ותקינה
+      if (image && image.size > 0) {
+        console.log('[CreatePost] Adding image to form data:', image.name, 'Size:', image.size, 'Type:', image.type);
+        
+        try {
+          // ניסיון ליצור עותק של הקובץ כדי לוודא שהוא תקין
+          const imageBuffer = await image.arrayBuffer();
+          if (imageBuffer.byteLength === 0) {
+            throw new Error('Buffer is empty');
+          }
+          
+          // יצירת קובץ חדש מהבאפר
+          const imageClone = new File([imageBuffer], image.name, { type: image.type });
+          console.log('[CreatePost] Created image clone:', imageClone.name, 'Size:', imageClone.size);
+          
+          if (imageClone.size === 0) {
+            throw new Error('Cloned file is empty');
+          }
+          
+          // הוספת העותק לטופס
+          formData.append('image', imageClone);
+        } catch (err) {
+          console.warn('[CreatePost] Failed to clone image, using original:', err);
+          formData.append('image', image);
+        }
+        
+        // לוג עם מידע נוסף על התמונה
+        console.log('[CreatePost] Image last modified:', new Date(image.lastModified).toISOString());
+      } else if (image) {
+        console.warn('[CreatePost] Image exists but may be invalid:', image.name, 'Size:', image.size);
+        // בדיקה נוספת עם הודעת שגיאה אם התמונה ריקה או לא תקינה
+        if (image.size === 0) {
+          setError('התמונה שנבחרה ריקה. נא לבחור תמונה תקינה או להסיר אותה.');
+          setIsSubmitting(false);
+          return;
+        }
       }
       
       // הוספת שדה userId מפורש
@@ -179,17 +314,24 @@ const CreatePost: React.FC = () => {
       
     } catch (error: any) {
       console.error('[CreatePost] Error creating post:', error);
-      console.error('[CreatePost] Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+      
+      if (error.message) {
+        console.error('[CreatePost] Error message:', error.message);
+      }
+      
+      if (error.response) {
+        console.error('[CreatePost] Error details:', {
+          status: error.response.status,
+          data: error.response.data
+        });
+      }
       
       // טיפול מיוחד בשגיאות אימות
       if (error.response?.status === 401 || error.response?.status === 403) {
         setError('פג תוקף ההתחברות. אנא התחבר מחדש.');
         navigate('/login', { replace: true });
       } else {
+        // הצגת הודעת השגיאה מהשרת או הודעה כללית
         setError(error.message || error.response?.data?.message || 'אירעה שגיאה ביצירת הפוסט. אנא נסה שוב.');
       }
     } finally {
@@ -261,7 +403,7 @@ const CreatePost: React.FC = () => {
                     id="image"
                     className="form-control"
                     accept="image/*"
-                    onChange={handleImageChange}
+                    onChange={handleFileChange}
                   />
                   <label className="input-group-text" htmlFor="image">
                     <span className="me-1">📷</span> בחר תמונה

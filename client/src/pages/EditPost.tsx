@@ -28,32 +28,70 @@ const EditPost: React.FC = () => {
       
       try {
         setLoading(true);
+        console.log(`[EditPost] Fetching post with ID: ${postId}`);
         const response = await postService.getPostById(postId);
         
-        const post = response.data || response;
+        // נבדוק שהתשובה קיימת ושיש בה שדה data או שהיא מכילה ישירות את הפוסט
+        if (!response) {
+          console.error('[EditPost] Response is empty or undefined');
+          setError('לא התקבלה תשובה מהשרת');
+          setLoading(false);
+          return;
+        }
+
+        // ננסה למצוא את אובייקט הפוסט, בין אם הוא מגיע בשדה data או ישירות
+        const post = response.data || response.post || response;
+        console.log('[EditPost] Post data received:', post);
         
-        if (!post) {
-          setError('הפוסט לא נמצא');
+        if (!post || typeof post !== 'object') {
+          console.error('[EditPost] Invalid post data:', post);
+          setError('נתוני הפוסט אינם תקינים');
+          setLoading(false);
           return;
         }
         
+        // לוודא שיש תוכן לפוסט
+        if (!post.content) {
+          console.error('[EditPost] Post has no content:', post);
+          setError('הפוסט לא מכיל תוכן');
+          setLoading(false);
+          return;
+        }
+
+        // בדיקת הרשאות - נוודא שיש אובייקט משתמש בפוסט וגם שיש משתמש מחובר
+        const postUserId = post.user?.id || post.user?._id;
+        const currentUserId = authState.user?.id || authState.user?._id;
+
+        console.log(`[EditPost] Checking permissions: Post user: ${postUserId}, Current user: ${currentUserId}`);
+        
+        if (!postUserId || !currentUserId) {
+          console.error('[EditPost] Missing user data for permission check');
+          setError('אין מספיק מידע כדי לאמת הרשאות');
+          setTimeout(() => navigate('/'), 2000);
+          return;
+        }
+
         // לוודא שהמשתמש הוא בעל הפוסט
-        if (post.user && post.user.id !== authState.user?.id) {
+        if (postUserId !== currentUserId) {
+          console.error(`[EditPost] Permission denied - post user: ${postUserId}, current user: ${currentUserId}`);
           setError('אין לך הרשאה לערוך פוסט זה');
           setTimeout(() => navigate('/'), 2000);
           return;
         }
         
+        // כל הבדיקות עברו, נעדכן את המצב עם נתוני הפוסט
+        console.log('[EditPost] Setting post content:', post.content);
         setContent(post.content);
         setCharacterCount(post.content.length);
         
         if (post.image) {
+          console.log('[EditPost] Setting post image:', post.image);
           setOriginalImage(post.image);
           setImagePreview(post.image);
         }
         
       } catch (error) {
-        console.error('Error fetching post:', error);
+        console.error('[EditPost] Error fetching post:', error);
         setError('אירעה שגיאה בטעינת הפוסט');
       } finally {
         setLoading(false);

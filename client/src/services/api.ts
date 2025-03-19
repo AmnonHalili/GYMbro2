@@ -215,4 +215,73 @@ export const callApiWithoutRedirect = async <T>(
   return response.data;
 };
 
+/**
+ * יוצר URL מלא לפי נתיב תמונה מהשרת
+ * כולל אפשרות בדיקת תקינות התמונה דרך ה-API
+ */
+export function getImageUrl(imagePath: string | null): string {
+  // אם אין נתיב תמונה, להחזיר ריק
+  if (!imagePath) {
+    console.log('[api] getImageUrl called with null or empty path');
+    return '';
+  }
+
+  // אם כבר URL מלא, להחזיר כמו שהוא
+  if (imagePath.startsWith('http')) {
+    return imagePath;
+  }
+  
+  // ניקוי ובדיקת נתיב התמונה
+  let cleanPath = imagePath;
+  
+  // וידוא שהנתיב מתחיל עם סלאש
+  if (!cleanPath.startsWith('/')) {
+    cleanPath = '/' + cleanPath;
+    console.log(`[api] Fixed image path to start with slash: ${cleanPath}`);
+  }
+  
+  // בדיקה אם יש כבר את המסלול הנכון
+  if (!cleanPath.includes('/uploads/')) {
+    // אם יש רק שם קובץ, נוסיף את הנתיב המלא
+    if (cleanPath.startsWith('/') && !cleanPath.includes('/')) {
+      cleanPath = `/uploads/posts${cleanPath}`;
+    } else {
+      // ניסיון לתקן נתיב חלקי
+      cleanPath = `/uploads/posts/${cleanPath.split('/').pop()}`;
+    }
+    console.log(`[api] Corrected image path: ${cleanPath}`);
+  }
+  
+  // בניית URL מלא
+  const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const serverBase = baseURL.replace('/api', ''); // הסרת /api מהסוף כי התמונות נמצאות בתיקיה הראשית
+  
+  const fullUrl = `${serverBase}${cleanPath}`;
+  console.log(`[api] Full image URL: ${fullUrl}`);
+  
+  return fullUrl;
+}
+
+/**
+ * מפעיל את תהליך תיקון קבצי התמונות הריקים
+ */
+export const fixEmptyImages = async (): Promise<{
+  fixed: number;
+  failed: number;
+  errors: string[];
+}> => {
+  try {
+    console.log('Requesting server to fix empty image files');
+    const response = await api.post('/fix-empty-images');
+    return response.data;
+  } catch (error) {
+    console.error('Error fixing empty images:', error);
+    return {
+      fixed: 0,
+      failed: 0,
+      errors: [String(error)]
+    };
+  }
+};
+
 export default api; 
