@@ -1,4 +1,4 @@
-import express, { Express, Request, Response } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -23,54 +23,143 @@ const port = process.env.PORT || 5000;
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true, // Allow cookies to be sent
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Access-Control-Allow-Origin']
 }));
-app.use(helmet());
+
+// הוספת middleware לטיפול בבקשות options עבור CORS
+app.options('*', cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Access-Control-Allow-Origin']
+}));
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' } // מאפשר טעינת משאבים מדומיינים אחרים
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 app.use(passport.initialize());
 
-// Helper function to verify uploads directory
-const verifyUploadsDirectory = () => {
-  const uploadsPath = path.join(__dirname, '../uploads');
-  console.log('[Server] Checking uploads directory:', uploadsPath);
-  
-  if (!fs.existsSync(uploadsPath)) {
-    console.error('[Server] CRITICAL ERROR: Uploads directory does not exist!');
-    fs.mkdirSync(uploadsPath, { recursive: true });
-    console.log('[Server] Created missing uploads directory');
-  } else {
-    console.log('[Server] Uploads directory exists');
-    
-    // Check posts directory
-    const postsPath = path.join(uploadsPath, 'posts');
-    if (!fs.existsSync(postsPath)) {
-      console.error('[Server] Posts directory does not exist!');
-      fs.mkdirSync(postsPath, { recursive: true });
-      console.log('[Server] Created missing posts directory');
-    } else {
-      // List some files to verify content
-      try {
-        const files = fs.readdirSync(postsPath);
-        console.log(`[Server] Found ${files.length} files in posts directory`);
-        if (files.length > 0) {
-          console.log('[Server] Sample files:', files.slice(0, 5));
-        }
-      } catch (err) {
-        console.error('[Server] Error reading posts directory:', err);
-      }
-    }
+// הגדרת תיקיות סטטיות
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+const postsDir = path.join(uploadsDir, 'posts');
+const profileDir = path.join(uploadsDir, 'profile');
+
+// יצירת התיקיות אם הן לא קיימות
+if (!fs.existsSync(uploadsDir)) {
+  console.log(`יוצר תיקיית uploads בנתיב: ${uploadsDir}`);
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+if (!fs.existsSync(postsDir)) {
+  console.log(`יוצר תיקיית uploads/posts בנתיב: ${postsDir}`);
+  fs.mkdirSync(postsDir, { recursive: true });
+}
+
+if (!fs.existsSync(profileDir)) {
+  console.log(`יוצר תיקיית uploads/profile בנתיב: ${profileDir}`);
+  fs.mkdirSync(profileDir, { recursive: true });
+}
+
+// הגדרת תיקיות סטטיות עם CORS headers
+app.use('/uploads', express.static(uploadsDir, {
+  setHeaders: (res) => {
+    res.set('Access-Control-Allow-Origin', '*');
   }
+}));
+
+app.use('/uploads/posts', express.static(postsDir, {
+  setHeaders: (res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+  }
+}));
+
+app.use('/uploads/profile', express.static(profileDir, {
+  setHeaders: (res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+  }
+}));
+
+console.log('תיקיות סטטיות הוגדרו:');
+console.log(`- /uploads -> ${uploadsDir}`);
+console.log(`- /uploads/posts -> ${postsDir}`);
+console.log(`- /uploads/profile -> ${profileDir}`);
+
+// בדיקת הרשאות קריאה/כתיבה
+try {
+  const testFilePath = path.join(uploadsDir, 'test-permissions.txt');
+  fs.writeFileSync(testFilePath, 'בדיקת הרשאות');
+  console.log(`בדיקת הרשאות כתיבה: הצלחה! נכתב קובץ זמני: ${testFilePath}`);
   
-  return uploadsPath;
+  const readContent = fs.readFileSync(testFilePath, 'utf-8');
+  console.log(`בדיקת הרשאות קריאה: הצלחה! תוכן הקובץ: ${readContent}`);
+  
+  fs.unlinkSync(testFilePath);
+  console.log('הקובץ הזמני נמחק בהצלחה');
+} catch (error) {
+  console.error('שגיאה בבדיקת הרשאות קריאה/כתיבה:', error);
+  console.error('ייתכן שיש בעיה בהרשאות של תיקיית uploads!');
+}
+
+// הגדרה נוספת עם CORS נכון
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Cache-Control', 'public, max-age=31536000');
+  next();
+}, express.static(path.join(process.cwd(), 'uploads')));
+
+// הדפסת מסלולים סטטיים שהוגדרו (לדיבאג)
+console.log(`[Server] 📋 הנתיבים הסטטיים שהוגדרו במערכת:`);
+app._router.stack.forEach((item: any) => {
+  if (item.name === 'serveStatic') {
+    console.log(`[Server] - הנתיב '${item.regexp}' מופנה לתיקייה: ${(item.handle as any).root}`);
+  }
+});
+
+// מעטפת אסינכרונית לטיפול בבקשות
+const asyncWrapper = (fn: (req: Request, res: Response) => Promise<any> | any) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await fn(req, res);
+    } catch (error) {
+      next(error);
+    }
+  };
 };
 
-// Serve uploaded files with improved logging
-const uploadsDir = verifyUploadsDirectory();
-app.use('/uploads', express.static(uploadsDir));
-console.log(`[Server] Static files middleware configured for path: ${uploadsDir}`);
+// נתיב מיוחד לתמונות שהועבר מ-routes/index.ts
+app.get('/api/image/:type/:filename', asyncWrapper((req: Request, res: Response) => {
+  const type = req.params.type;
+  const filename = req.params.filename;
+  
+  if (!['posts', 'profile'].includes(type)) {
+    return res.status(400).json({ error: 'Invalid image type' });
+  }
+  
+  const imagePath = path.join(__dirname, '../uploads', type, filename);
+  console.log(`[ImageService] Serving image from: ${imagePath}`);
+  
+  if (!fs.existsSync(imagePath)) {
+    console.log(`[ImageService] File not found: ${imagePath}`);
+    return res.status(404).json({ error: 'Image not found' });
+  }
+  
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Cache-Control', 'public, max-age=31536000');
+  
+  return res.sendFile(imagePath);
+}));
+
+// setup static files
+app.use(express.static(path.join(__dirname, 'public')));
 
 // API routes
 app.get('/', (req: Request, res: Response) => {

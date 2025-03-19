@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import Post from '../models/Post';
-import { IUser } from '../models/User';
 import fs from 'fs';
 import path from 'path';
-import { manualSaveUploadedFile } from '../middleware/upload';
+import { IUser } from '../models/User';
+import mongoose from 'mongoose';
 
 // הרחבת הטיפוס File של מולטר כדי לכלול את השדה publicPath שאנחנו מוסיפים
 declare module 'express-serve-static-core' {
@@ -12,6 +12,22 @@ declare module 'express-serve-static-core' {
       publicPath?: string;
     };
   }
+}
+
+// פונקציה לתיקון נתיב תמונה - מוודאת שנתיב התמונה תקין
+function fixImagePath(imagePath: string | null | undefined): string | null {
+  if (!imagePath) return null;
+  
+  // וידוא שהנתיב מתחיל ב-/
+  let fixedPath = imagePath;
+  if (!fixedPath.startsWith('/')) {
+    fixedPath = '/' + fixedPath;
+  }
+  
+  // החלפת \ ב-/ (למקרה של Windows)
+  fixedPath = fixedPath.replace(/\\/g, '/');
+  
+  return fixedPath;
 }
 
 // הוספת טיפוס עבור האובייקט req.file המורחב
@@ -23,6 +39,14 @@ interface RequestWithFile extends Request {
     image?: string;
     [key: string]: any;
   };
+  // הוספת השדות הישירים שמשתמשים בהם בקוד
+  image?: string;
+  imgUrl?: string;
+}
+
+// הגדרת הטיפוס המורחב של Request שכולל את המשתמש
+interface RequestWithUser extends Request {
+  user?: IUser;
 }
 
 // Get all posts (feed) with pagination
@@ -132,333 +156,468 @@ export const getPostById = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// Create a new post
-export const createPost = async (req: RequestWithFile, res: Response): Promise<void> => {
-  // יצירת תיקיית לוג אם לא קיימת
-  const logPath = path.join(__dirname, '../../logs');
-  if (!fs.existsSync(logPath)) {
-    fs.mkdirSync(logPath, { recursive: true });
-  }
-  
-  // פונקציית יומן שכותבת גם לקונסול וגם לקובץ
-  const logFile = path.join(logPath, 'createPost.log');
-  const log = (message: string) => {
-    const timestamp = new Date().toISOString();
-    const logEntry = `${timestamp} - ${message}\n`;
-    fs.appendFileSync(logFile, logEntry);
-    console.log(message);
-  };
-  
-  log('==== CREATE POST START ====');
+// Create a new post - גרסה עם דיבאג מפורט
+export const createPost = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
-    // שימוש ב-type assertion לגישה לאובייקט המשתמש
-    const user = (req as any).user;
+    console.log('=== התחלת יצירת פוסט חדש עם דיבאג מפורט ===');
+    console.log('נתוני בקשה:', {
+      headers: req.headers['content-type'],
+      body: req.body,
+      user: req.user ? `${req.user.username} (${req.user._id})` : 'לא מחובר'
+    });
     
-    if (!user) {
-      log('==== CREATE POST FAILED: No authenticated user ====');
-      res.status(401).json({ message: 'User not authenticated' });
+    // בדיקת קובץ
+    console.log('מידע על הקובץ:', req.file ? {
+      filename: req.file.filename,
+      originalname: req.file.originalname,
+      path: req.file.path,
+      size: req.file?.size || 0,
+      mimetype: req.file.mimetype
+    } : 'אין קובץ');
+    
+    // בדיקת אימות משתמש
+    if (!req.user) {
+      console.log('שגיאה: משתמש לא מחובר');
+      res.status(401).json({ message: 'אינך מחובר' });
       return;
     }
     
+    // בדיקת תוכן
     const { content } = req.body;
-    
     if (!content) {
-      log('==== CREATE POST FAILED: Missing content ====');
-      res.status(400).json({ message: 'Content is required' });
+      console.log('שגיאה: חסר תוכן הפוסט');
+      res.status(400).json({ message: 'תוכן הפוסט הוא שדה חובה' });
       return;
     }
     
-    // לוג מפורט יותר של הבקשה והקובץ שהתקבל
-    log(`[postController] Create post request received from user: ${user._id}`);
-    log(`[postController] Content length: ${content.length}`);
-    log(`[postController] File attached: ${req.file ? 'Yes' : 'No'}`);
-    log(`[postController] Request fileData: ${req.fileData ? JSON.stringify(req.fileData) : 'None'}`);
+    // מידע על התמונה (אם הועלתה)
+    let imageUrl = null;
     
-    if (req.file) {
-      log('[postController] File details:');
-      log(`  - Filename: ${req.file.filename}`);
-      log(`  - Original name: ${req.file.originalname}`);
-      log(`  - Path: ${req.file.path}`);
-      log(`  - Size: ${req.file.size} bytes`);
-      log(`  - MIME type: ${req.file.mimetype}`);
-      log(`  - Public path: ${req.file.publicPath || '(not set)'}`);
-    }
-    
-    // בדיקה אם יש קובץ ואם הוא תקין
-    let imagePath = null;
-    
-    // קודם כל, בדוק אם יש לנו מידע על תמונה מה-middleware במיקום החלופי
-    if (req.fileData && req.fileData.image) {
-      log(`[postController] Found fileData.image: ${req.fileData.image}`);
-      imagePath = req.fileData.image;
-    }
-    // אחרת, אם יש קובץ רגיל שהועלה
-    else if (req.file) {
-      // שימוש בנתיב הציבורי שנקבע במידלוור, או בניית הנתיב לפי המבנה הסטנדרטי
-      imagePath = req.file.publicPath || `/uploads/posts/${req.file.filename}`;
-      log(`[postController] Image path set to: ${imagePath}`);
+    // אם יש תמונה בבקשה, בדוק שהיא תקינה
+    if (req.body.image) {
+      console.log(`נמצא נתיב תמונה בבקשה: ${req.body.image}`);
+      imageUrl = fixImagePath(req.body.image);
+      console.log(`נתיב תמונה אחרי תיקון: ${imageUrl}`);
       
-      // וידוא שהנתיב תמיד מתחיל ב-/uploads/
-      if (!imagePath.startsWith('/uploads/')) {
-        imagePath = `/uploads/posts/${path.basename(imagePath)}`;
-        log(`[postController] Corrected image path to: ${imagePath}`);
-      }
-      
-      // בדיקה נוספת שהקובץ אכן קיים בדיסק ובעל גודל > 0
-      let fullPath = '';
-      
-      if (path.isAbsolute(req.file.path)) {
-        fullPath = req.file.path;
-      } else {
-        fullPath = path.resolve(__dirname, '../../', imagePath.replace(/^\//, ''));
-      }
-      
-      log(`[postController] Validating image at full path: ${fullPath}`);
-      log(`[postController] Checking: File exists? ${fs.existsSync(fullPath)}`);
+      // בדיקה שהקובץ קיים
+      const uploadsPath = path.join(process.cwd(), 'uploads');
+      const relativePath = imageUrl?.replace(/^\/uploads\//, '') || '';
+      const fullPath = path.join(uploadsPath, relativePath);
       
       if (fs.existsSync(fullPath)) {
+        console.log(`הקובץ נמצא בנתיב: ${fullPath}`);
         const stats = fs.statSync(fullPath);
-        log(`[postController] File stats: size = ${stats.size} bytes, created = ${stats.birthtime}`);
-        
-        if (stats.size === 0) {
-          log('[postController] ERROR: File exists but has 0 bytes');
-          imagePath = null; // נוותר על התמונה אם הקובץ ריק
-          res.status(400).json({ message: 'התמונה שהועלתה ריקה. נא לנסות שוב.' });
-          return;
-        }
+        console.log(`גודל הקובץ: ${stats.size} בייטים`);
       } else {
-        log(`[postController] ERROR: File does not exist on disk: ${fullPath}`);
-        imagePath = null; // נוותר על התמונה אם הקובץ לא קיים
-        res.status(400).json({ message: 'שגיאה בשמירת התמונה. הקובץ לא נשמר בשרת.' });
-        return;
+        console.log(`אזהרה: הקובץ לא נמצא בנתיב ${fullPath}!`);
       }
     }
     
-    log(`[postController] Final image path for database: ${imagePath}`);
-    
-    // תיקון: שימוש ב-imagePath רק אם הוא לא null
-    const newPost = new Post({
+    // אם קיים גם קובץ מצורף, בדוק אותו
+    if (req.file) {
+      console.log(`תמונה הועלתה: ${req.file.filename}. בודק אם הקובץ קיים במערכת הקבצים...`);
+      
+      // בדיקה שהקובץ אכן נשמר במערכת הקבצים
+      const fullPath = req.file.path;
+      if (fs.existsSync(fullPath)) {
+        const stats = fs.statSync(fullPath);
+        console.log(`הקובץ נמצא בנתיב ${fullPath}, גודל: ${stats.size} בייטים`);
+        
+        imageUrl = fixImagePath(`/uploads/posts/${req.file.filename}`);
+        console.log(`נתיב תמונה שנשמר בדאטהבייס: ${imageUrl}`);
+      } else {
+        console.log(`שגיאה: הקובץ לא נמצא בנתיב ${fullPath}!`);
+      }
+    }
+
+    // יצירת הפוסט במסד הנתונים
+    const postData = {
       content,
-      user: user._id,
-      image: imagePath
-    });
+      user: req.user._id,
+      image: imageUrl
+    };
     
-    log(`[postController] Post object created: ${JSON.stringify({
-      content: content.substring(0, 30) + (content.length > 30 ? '...' : ''),
-      user: user._id,
-      image: imagePath
-    })}`);
+    console.log('יוצר פוסט עם הנתונים:', postData);
+
+    const post = new Post(postData);
+    console.log('ניסיון לשמור את הפוסט במסד הנתונים...');
+    const savedPost = await post.save();
+    console.log(`פוסט נשמר בהצלחה עם מזהה: ${savedPost._id}`);
     
-    log('[postController] Saving post to database...');
-    await newPost.save();
-    log(`[postController] Post saved successfully, ID: ${newPost._id}`);
-    
-    // Populate user data for response
-    log('[postController] Populating user data for response');
-    await newPost.populate('user', 'username profilePicture');
-    
-    // לוג נוסף להצלחת היצירה
-    log(`[postController] Post created successfully: ${JSON.stringify({
-      id: newPost._id,
-      content: newPost.content.substring(0, 30) + (newPost.content.length > 30 ? '...' : ''),
-      imagePath: newPost.image,
-      userId: (newPost.user as IUser)._id
-    })}`);
-    
-    log('==== CREATE POST SUCCESS ====');
-    
-    res.status(201).json({
-      message: 'Post created successfully',
-      post: newPost
-    });
+    try {
+      // החזרת פרטי הפוסט המלאים
+      console.log('מעשיר את הנתונים עם פרטי משתמש ולייקים...');
+      const populatedPost = await Post.findById(savedPost._id)
+        .populate('user', 'username profilePicture')
+        .populate('likes', 'username');
+      
+      console.log(`פוסט נוצר בהצלחה, מזהה: ${savedPost._id}`);
+      
+      // הכנת אובייקט ללא מאפיינים מעגליים
+      const populatedUser = populatedPost?.user as unknown as { 
+        _id: mongoose.Types.ObjectId;
+        username?: string;
+        profilePicture?: string;
+      };
+      
+      const safePost = {
+        _id: populatedPost?._id?.toString(),
+        id: populatedPost?._id?.toString(),
+        content: populatedPost?.content,
+        image: populatedPost?.image,
+        user: {
+          _id: populatedUser?._id?.toString(),
+          id: populatedUser?._id?.toString(),
+          username: populatedUser?.username,
+          profilePicture: populatedUser?.profilePicture
+        },
+        createdAt: populatedPost?.createdAt,
+        updatedAt: populatedPost?.updatedAt,
+        likesCount: populatedPost?.likesCount || 0,
+        commentsCount: populatedPost?.commentsCount || 0
+      };
+      
+      console.log('שולח תשובה ללקוח:', JSON.stringify(safePost));
+      res.status(201).json(safePost);
+      return;
+    } catch (populateError) {
+      console.error('שגיאה בהעשרת פרטי הפוסט:', populateError);
+      
+      // במקרה של שגיאה, נחזיר את הפוסט הבסיסי
+      const basicPost = {
+        _id: savedPost._id.toString(),
+        id: savedPost._id.toString(),
+        content: savedPost.content,
+        image: savedPost.image,
+        user: savedPost.user.toString(),
+        createdAt: savedPost.createdAt,
+        updatedAt: savedPost.updatedAt
+      };
+      
+      console.log('שולח תשובה בסיסית ללקוח:', JSON.stringify(basicPost));
+      res.status(201).json(basicPost);
+      return;
+    }
   } catch (error) {
-    log(`[postController] Error creating post: ${error}`);
-    log('==== CREATE POST FAILED ====');
-    res.status(500).json({ message: 'Server error while creating post' });
+    console.error('!!! שגיאה חמורה ביצירת פוסט !!!', error);
+    console.error('פרטי השגיאה:', error instanceof Error ? error.message : String(error));
+    console.error('סוג השגיאה:', error instanceof Error ? error.name : 'לא ידוע');
+    console.error('מקור השגיאה:', error instanceof Error && error.stack ? error.stack : 'לא ידוע');
+    
+    // בדיקה אם הפוסט כבר נשמר למרות השגיאה
+    if (error instanceof Error && error.message.includes('already saved') && req.body.postId) {
+      try {
+        // החזרת פרטי הפוסט הבסיסיים
+        const existingPost = await Post.findById(req.body.postId);
+        if (existingPost) {
+          res.status(201).json({
+            _id: existingPost._id,
+            id: existingPost._id,
+            content: existingPost.content,
+            image: existingPost.image
+          });
+          return;
+        }
+      } catch (findError) {
+        console.error('שגיאה בחיפוש פוסט שכבר נשמר:', findError);
+      }
+    }
+    
+    res.status(500).json({ 
+      message: 'שגיאת שרת ביצירת פוסט',
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 };
 
 // Update a post
-export const updatePost = async (req: RequestWithFile, res: Response): Promise<void> => {
+export const updatePost = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
-    const userId = (req.user as any)?._id || (req.user as any)?.id;
-    
-    // לוג בקשה לעדכון פוסט
-    console.log(`[postController] Received request to update post ${id} by user ${userId}`);
-    console.log(`[postController] Request body:`, req.body);
-    console.log(`[postController] File:`, req.file);
-    
-    if (!userId) {
-      console.error(`[postController] No user ID found in request`);
-      res.status(401).json({ message: 'User not authenticated' });
+    console.log('=== התחלת עדכון פוסט ===');
+    console.log(`ID של הפוסט לעדכון: ${req.params.postId}`);
+    console.log('מידע מהבקשה:', {
+      body: req.body,
+      file: req.file ? {
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        path: req.file.path,
+        size: req.file.size,
+        publicPath: req.body.image
+      } : 'אין קובץ חדש',
+      user: req.user
+    });
+
+    // בדיקת אימות משתמש
+    if (!req.user) {
+      console.error('אין משתמש בבקשה - חוסר אימות');
+      res.status(401).json({ message: 'משתמש לא מורשה' });
       return;
     }
 
-    // Find the post to check ownership
-    const post = await Post.findById(id);
+    // שליפת הפוסט
+    const post = await Post.findById(req.params.postId);
     
     if (!post) {
-      console.error(`[postController] Post ${id} not found`);
-      res.status(404).json({ message: 'Post not found' });
+      console.error(`פוסט עם ID ${req.params.postId} לא נמצא`);
+      res.status(404).json({ message: 'פוסט לא נמצא' });
       return;
     }
 
-    // Check if the user is the post owner
-    const postUserId = post.user.toString();
-    console.log(`[postController] Post user ID: ${postUserId}, Current user ID: ${userId}`);
-    
-    if (postUserId !== userId.toString()) {
-      console.error(`[postController] User ${userId} attempted to update post ${id} owned by ${postUserId}`);
-      res.status(403).json({ message: 'You can only update your own posts' });
+    // בדיקת בעלות
+    if (post.user.toString() !== req.user._id.toString()) {
+      console.error(`המשתמש ${req.user._id} אינו בעל הפוסט ${post._id}`);
+      res.status(403).json({ message: 'אתה לא מורשה לערוך פוסט זה' });
       return;
     }
 
-    // Get the content from the request body
-    const { content } = req.body;
-    if (!content || content.trim() === '') {
-      console.error(`[postController] Post update rejected: empty content`);
-      res.status(400).json({ message: 'Post content is required' });
-      return;
-    }
-
-    // Update post data
-    const updateData: any = { content };
-
-    // Handle image update (add, remove, or keep existing)
-    if (req.file) {
-      // Log file data for debugging
-      console.log(`[postController] New image upload:`, {
-        filename: req.file.filename,
-        size: req.file.size,
-        mimetype: req.file.mimetype
-      });
-      
-      // Add new image - וידוא שיש / בהתחלה
-      const imagePath = `/uploads/posts/${req.file.filename}`;
-      updateData.image = imagePath;
-      
-      console.log(`[postController] Image path set to: "${imagePath}"`);
-      
-      // בדיקה שהנתיב תקין ומתחיל ב-/
-      if (!imagePath.startsWith('/')) {
-        console.error(`[postController] ERROR: Image path does not start with /: "${imagePath}"`);
-      }
-      
-      // If there was an old image, try to delete it (don't break if fails)
-      if (post.image) {
-        const oldImagePath = path.join(__dirname, '../../', post.image);
-        try {
-          if (fs.existsSync(oldImagePath)) {
-            fs.unlinkSync(oldImagePath);
-            console.log(`[postController] Deleted old image: ${oldImagePath}`);
-          }
-        } catch (err) {
-          console.error(`[postController] Error deleting old image ${oldImagePath}:`, err);
-          // Continue even if file delete fails
-        }
-      }
-    } else if (req.body.removeImage === 'true') {
-      // User wants to remove the image without adding a new one
-      console.log(`[postController] Removing image from post ${id}`);
-      updateData.image = null;
-      
-      // Delete the image file if it exists
-      if (post.image) {
-        const oldImagePath = path.join(__dirname, '../../', post.image);
-        try {
-          if (fs.existsSync(oldImagePath)) {
-            fs.unlinkSync(oldImagePath);
-            console.log(`[postController] Deleted removed image: ${oldImagePath}`);
-          }
-        } catch (err) {
-          console.error(`[postController] Error deleting removed image ${oldImagePath}:`, err);
-          // Continue even if file delete fails
-        }
-      }
-    }
-    // Otherwise, keep the existing image
+    // עדכון פרטי הפוסט
+    const { content, removeImage } = req.body;
+    const oldImage = post.image;
     
-    // Log the update data
-    console.log(`[postController] Updating post ${id} with data:`, updateData);
-
-    // Update the post
-    const updatedPost = await Post.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    ).populate('user');
-    
-    if (!updatedPost) {
-      console.error(`[postController] Could not update post ${id} - not found after update check`);
-      res.status(404).json({ message: 'Post not found after update' });
-      return;
-    }
-
-    console.log(`[postController] Post ${id} updated successfully`);
-    
-    // הסרת שדות רגישים מאובייקט המשתמש
-    // @ts-ignore: קריאה ל-toObject על אובייקט לא ידוע
-    const userObject = updatedPost.user.toObject ? updatedPost.user.toObject() : updatedPost.user;
-    if (userObject) {
-      // @ts-ignore: שדות דינמיים
-      delete userObject.password;
-      // @ts-ignore: שדות דינמיים
-      delete userObject.refreshToken;
-    }
-    
-    // Send back the updated post with user data
-    res.status(200).json({
-      post: {
-        ...updatedPost.toObject(),
-        user: userObject
-      },
-      message: 'Post updated successfully'
+    console.log('מצב תמונה קודם:', oldImage);
+    console.log('נתוני עדכון:', {
+      תוכן: content,
+      הסרתתמונה: removeImage === 'true',
+      תמונהחדשה: req.body.image || 'אין תמונה חדשה'
     });
+
+    // עדכון תוכן אם התקבל
+    if (content !== undefined) {
+      post.content = content;
+    }
+    
+    // טיפול בתמונה
+    if (removeImage === 'true') {
+      console.log('הסרת תמונה התבקשה');
+      // מחיקת התמונה הישנה מהשרת אם קיימת
+      if (oldImage) {
+        try {
+          const uploadsPath = path.join(process.cwd(), 'uploads');
+          const relativePath = oldImage.replace(/^\/uploads\//, '');
+          const oldImagePath = path.join(uploadsPath, relativePath);
+          
+          console.log(`מנסה למחוק תמונה ישנה בנתיב: ${oldImagePath}`);
+          
+          if (fs.existsSync(oldImagePath)) {
+            fs.unlinkSync(oldImagePath);
+            console.log('תמונה ישנה נמחקה בהצלחה');
+          } else {
+            console.log('תמונה ישנה לא נמצאה במערכת הקבצים');
+          }
+        } catch (err) {
+          console.error('שגיאה במחיקת התמונה הישנה:', err);
+        }
+      }
+      
+      post.image = null;
+    } 
+    // אם יש תמונה חדשה, עדכן את שדה התמונה
+    else if (req.body.image) {
+      console.log(`עדכון תמונה לנתיב חדש: ${req.body.image}`);
+      
+      // תיקון נתיב התמונה
+      const newImagePath = fixImagePath(req.body.image);
+      
+      // מחיקת התמונה הישנה אם קיימת ושונה מהחדשה
+      if (oldImage && oldImage !== newImagePath) {
+        try {
+          const uploadsPath = path.join(process.cwd(), 'uploads');
+          const relativePath = oldImage.replace(/^\/uploads\//, '');
+          const oldImagePath = path.join(uploadsPath, relativePath);
+          
+          console.log(`מנסה למחוק תמונה ישנה בנתיב: ${oldImagePath}`);
+          
+          if (fs.existsSync(oldImagePath)) {
+            fs.unlinkSync(oldImagePath);
+            console.log('תמונה ישנה נמחקה בהצלחה');
+          } else {
+            console.log('תמונה ישנה לא נמצאה במערכת הקבצים');
+          }
+        } catch (err) {
+          console.error('שגיאה במחיקת התמונה הישנה:', err);
+        }
+      }
+      
+      post.image = newImagePath;
+    }
+    // אם לא התבקשה הסרה ולא התקבלה תמונה חדשה, משאיר את התמונה הקיימת
+    
+    // שמירת העדכונים
+    await post.save();
+    console.log(`פוסט ${post._id} עודכן בהצלחה`);
+    
+    // שליפת הפוסט המעודכן עם פרטי משתמש
+    const updatedPost = await Post.findById(post._id)
+      .populate('user', 'username profilePicture')
+      .populate('likes', 'username');
+    
+    console.log('פוסט מעודכן נשלח ללקוח:', {
+      id: updatedPost?._id,
+      content: updatedPost?.content,
+      image: updatedPost?.image
+    });
+    
+    res.status(200).json(updatedPost);
   } catch (error) {
-    console.error('[postController] Error updating post:', error);
-    res.status(500).json({ message: 'Server error while updating post' });
+    console.error('שגיאה בעדכון פוסט:', error);
+    res.status(500).json({ 
+      message: 'שגיאת שרת בעדכון פוסט', 
+      error: (error as Error).message
+    });
   }
 };
 
 // Delete a post
-export const deletePost = async (req: Request, res: Response): Promise<void> => {
+export const deletePost = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
-    // שימוש ב-type assertion לגישה לאובייקט המשתמש
-    const user = (req as any).user;
-    const { postId } = req.params;
+    console.log('=== התחלת מחיקת פוסט ===');
     
-    // Find the post
+    if (!req.user) {
+      console.error('אין משתמש מחובר בבקשה');
+      res.status(401).json({ message: 'משתמש לא מורשה' });
+      return;
+    }
+    
+    const { postId } = req.params;
+    console.log(`ניסיון למחוק פוסט ${postId} על ידי משתמש ${req.user._id}`);
+    
+    // מציאת הפוסט
     const post = await Post.findById(postId);
     
     if (!post) {
-      res.status(404).json({ message: 'Post not found' });
+      console.error(`פוסט עם ID ${postId} לא נמצא`);
+      res.status(404).json({ message: 'פוסט לא נמצא' });
       return;
     }
     
-    // Check if the user is the post owner
-    if (post.user.toString() !== user._id.toString()) {
-      res.status(403).json({ message: 'User not authorized to delete this post' });
+    // בדיקת בעלות
+    if (post.user.toString() !== req.user._id.toString()) {
+      console.error(`המשתמש ${req.user._id} אינו הבעלים של פוסט ${postId}`);
+      res.status(403).json({ message: 'אתה לא מורשה למחוק פוסט זה' });
       return;
     }
     
-    // Delete image if exists
+    // מחיקת התמונה אם קיימת
     if (post.image) {
-      const imagePath = path.join(__dirname, '../../', post.image);
+      const imagePath = path.join(process.cwd(), post.image.replace(/^\//, ''));
+      console.log(`בודק אם יש למחוק תמונה בנתיב: ${imagePath}`);
+      
       if (fs.existsSync(imagePath)) {
         fs.unlinkSync(imagePath);
+        console.log(`תמונה נמחקה בהצלחה: ${imagePath}`);
+      } else {
+        console.log(`לא נמצאה תמונה לפוסט בנתיב: ${imagePath}`);
       }
     }
     
-    // Delete the post
+    // מחיקת הפוסט
     await Post.findByIdAndDelete(postId);
+    console.log(`פוסט ${postId} נמחק בהצלחה`);
     
     res.status(200).json({ 
-      message: 'Post deleted successfully',
+      message: 'פוסט נמחק בהצלחה',
       postId
     });
   } catch (error) {
-    console.error('Error deleting post:', error);
-    res.status(500).json({ message: 'Server error while deleting post' });
+    console.error('שגיאה במחיקת פוסט:', error);
+    res.status(500).json({ message: 'שגיאת שרת במחיקת פוסט', error: (error as Error).message });
+  }
+};
+
+// עדכון נתיבי תמונות בפוסטים קיימים - פונקציה זמנית
+export const fixPostImages = async (req: Request, res: Response): Promise<void> => {
+  console.log('=== התחלת תיקון נתיבי תמונות בפוסטים ===');
+  
+  try {
+    // וידוא שהמשתמש מחובר עם הרשאות מתאימות
+    const user = (req as any).user;
+    
+    if (!user) {
+      res.status(401).json({ message: 'User not authenticated' });
+      return;
+    }
+    
+    console.log(`בקשה לתיקון תמונות מהמשתמש: ${user.username} (${user._id})`);
+    
+    // יצירת פונקציות עזר במקום אלו שהיו קודם
+    function fixImagePath(imagePath: string): string {
+      if (!imagePath) return '';
+      
+      // וידוא שהנתיב מתחיל ב- /uploads/
+      if (!imagePath.startsWith('/uploads/')) {
+        const fileName = imagePath.split('/').pop() || '';
+        return `/uploads/posts/${fileName}`;
+      }
+      
+      return imagePath;
+    }
+    
+    // מציאת כל הפוסטים עם תמונות
+    const posts = await Post.find({ image: { $ne: null } });
+    
+    console.log(`נמצאו ${posts.length} פוסטים עם תמונות לבדיקה`);
+    
+    // נתונים סטטיסטיים
+    const stats = {
+      examined: 0,
+      fixed: 0,
+      failed: 0,
+      errors: [] as string[]
+    };
+    
+    // עבור על כל הפוסטים ובדוק/תקן את נתיבי התמונות
+    for (const post of posts) {
+      stats.examined++;
+      
+      // בדיקה שיש נתיב תמונה
+      if (!post.image) {
+        continue;
+      }
+      
+      console.log(`בדיקת פוסט ${post._id}, נתיב תמונה נוכחי: ${post.image}`);
+      
+      try {
+        // בדיקה אם יש צורך בתיקון נתיב התמונה
+        const imagePath = post.image;
+        
+        // ניקוי נתיב התמונה
+        const fixedPath = fixImagePath(imagePath);
+        
+        if (fixedPath !== imagePath) {
+          console.log(`נתיב תמונה לא תקין נמצא, מנקה מ-${imagePath} ל-${fixedPath}`);
+          
+          // עדכון נתיב התמונה בפוסט
+          post.image = fixedPath;
+          
+          // שמירת השינויים
+          await post.save();
+          
+          console.log(`נתיב התמונה תוקן בהצלחה לפוסט ${post._id}`);
+          stats.fixed++;
+        } else {
+          console.log(`נתיב התמונה תקין לפוסט ${post._id}`);
+        }
+      } catch (error) {
+        stats.failed++;
+        const errorMessage = `שגיאה בתיקון נתיב תמונה לפוסט ${post._id}: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(errorMessage);
+        stats.errors.push(errorMessage);
+      }
+    }
+    
+    console.log('=== סיום תיקון נתיבי תמונות בפוסטים ===');
+    console.log(`סיכום: נבדקו ${stats.examined}, תוקנו ${stats.fixed}, נכשלו ${stats.failed}`);
+    
+    res.status(200).json({
+      message: `Fixed ${stats.fixed} post image paths out of ${stats.examined} examined`,
+      stats
+    });
+    
+  } catch (error) {
+    console.error('שגיאה כללית בתיקון נתיבי תמונות:', error);
+    res.status(500).json({
+      message: 'Error fixing post image paths',
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 };

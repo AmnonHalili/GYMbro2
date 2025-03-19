@@ -282,19 +282,33 @@ const CreatePost: React.FC = () => {
       // מנסים לזהות את ה-ID בהתאם למבנה התשובה
       let postId: string | undefined;
       
-      // בדיקת מבנה התשובה המעודכן
-      if (response.post && typeof response.post === 'object') {
-        // הפוסט נמצא בשדה post
-        postId = response.post.id || response.post._id;
-        console.log('[CreatePost] Found post ID in response.post:', postId);
-      } else if (response.data && typeof response.data === 'object') {
-        // מבנה ApiResponse<Post> סטנדרטי
-        postId = response.data.id || response.data._id;
-        console.log('[CreatePost] Found post ID in response.data:', postId);
-      } else if (typeof response === 'object') {
-        // ייתכן שהמבנה שונה מהצפוי
-        postId = (response as any).id || (response as any)._id;
-        console.log('[CreatePost] Found post ID directly in response:', postId);
+      // בדיקת מבנה התשובה
+      if (typeof response === 'object') {
+        // טיפול באובייקט בפורמט מפולמורפי
+        const postData = response as any; // המרה ל-any כדי להתמודד עם מבנה משתנה
+        
+        if (postData._id) {
+          // מקרה שבו השרת מחזיר את הפוסט ישירות
+          postId = postData._id;
+          console.log('[CreatePost] Found post ID directly in response:', postId);
+        } else if (postData.id) {
+          postId = postData.id;
+          console.log('[CreatePost] Found post ID (id) directly in response:', postId);
+        } else if (postData.post?._id) {
+          // מקרה שבו השרת עוטף את הפוסט בשדה post
+          postId = postData.post._id;
+          console.log('[CreatePost] Found post ID in response.post:', postId);
+        } else if (postData.post?.id) {
+          postId = postData.post.id;
+          console.log('[CreatePost] Found post ID in response.post:', postId);
+        } else if (postData.data?._id) {
+          // מקרה שבו השרת עוטף את הפוסט בשדה data
+          postId = postData.data._id;
+          console.log('[CreatePost] Found post ID in response.data:', postId);
+        } else if (postData.data?.id) {
+          postId = postData.data.id;
+          console.log('[CreatePost] Found post ID in response.data:', postId);
+        }
       }
       
       // ניקוי הטופס אחרי יצירת פוסט בכל מקרה
