@@ -200,7 +200,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostDeleted }) => {
       }
       
       // Try to load the image with a direct path if the URL approach failed
-      const serverBase = process.env.REACT_APP_API_URL || window.location.origin;
+      const serverBase = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
       const directPath = post.image.startsWith('/') 
         ? `${serverBase}${post.image}`
         : `${serverBase}/uploads/posts/${post.image}`;

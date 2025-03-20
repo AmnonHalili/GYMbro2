@@ -151,7 +151,7 @@ export const processPostData = (post: any): void => {
     
     // הוספת URL מלא עבור תצוגת התמונה
     if (!post.imageUrl) {
-      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
       post.imageUrl = post.image.startsWith('http') 
         ? post.image 
         : `${baseUrl}${post.image}`;
@@ -194,7 +194,7 @@ export const getPosts = async (page: number = 1, limit: number = 10): Promise<Ap
           
           // הוספת URL מלא לתמונה
           if (!post.imageUrl) {
-            const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+            const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
             post.imageUrl = post.image.startsWith('http') 
               ? post.image 
               : `${baseUrl}${post.image}`;
@@ -364,7 +364,7 @@ export const getPostById = async (postId: string, maxRetries: number = 5): Promi
         
         // הוספת URL מלא עבור תצוגת התמונה אם לא קיים
         if (!post.imageUrl) {
-          const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+          const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
           post.imageUrl = post.image.startsWith('http') 
             ? post.image 
             : `${baseUrl}${post.image}`;

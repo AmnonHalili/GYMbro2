@@ -1,0 +1,25 @@
+{
+  "name": "gymbro-app",
+  "version": "1.0.0",
+  "description": "GYMbro Application",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server/dist/src/index.js",
+    "client": "cd client && npm run start",
+    "server": "cd server && npm run dev",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "cd client && npm run build && cd ../server && npm run build",
+    "install-all": "npm install && cd client && npm install && cd ../server && npm install"
+  },
+  "keywords": [
+    "MERN",
+    "TypeScript",
+    "React",
+    "Gym"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+} 

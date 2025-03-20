@@ -54,7 +54,7 @@ export const createComment = async (req: Request, res: Response): Promise<void> 
         username: user.username,
         profilePicture: user.profilePicture || ''
       }
-    });
+    }});
   } catch (error) {
     console.error('Error creating comment:', error);
     res.status(500).json({ message: 'Server error while creating comment' });

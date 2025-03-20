@@ -16,11 +16,11 @@ export const setNavigate = (navigateFunction: any) => {
 };
 
 // בתחילת הקובץ, לפני יצירת אובייקט ה-API, אני רוצה לוודא שיש הגדרה נכונה של הבסיס URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 // יצירת instance חדש של axios עם קונפיגורציה בסיסית
 const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: API_BASE_URL,
   timeout: 20000, // 20 seconds timeout
   headers: {
     'Content-Type': 'application/json',
@@ -29,7 +29,7 @@ const api = axios.create({
   withCredentials: true // Include cookies in cross-site requests
 });
 
-console.log(`API Base URL configured to: ${API_BASE_URL}/api`);
+console.log(`API Base URL configured to: ${API_BASE_URL}`);
 
 // Request interceptor for adding auth token
 api.interceptors.request.use(
@@ -163,7 +163,7 @@ api.interceptors.response.use(
         console.log('Attempting to refresh token');
         // Call refresh token endpoint
         const response = await axios.post(
-          `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/auth/refresh-token`,
+          `${API_BASE_URL}/auth/refresh-token`,
           { refreshToken },
           { withCredentials: true }
         );
