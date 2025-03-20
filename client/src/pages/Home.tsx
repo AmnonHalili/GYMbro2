@@ -114,8 +114,8 @@ const Home: React.FC = () => {
       
       if (Array.isArray(response)) {
         setPosts(response);
-      } else if (response.data && Array.isArray(response.data)) {
-        setPosts(response.data);
+      } else if (response.posts && Array.isArray(response.posts)) {
+        setPosts(response.posts);
       } else if (response.posts) {
         setPosts((response.posts as unknown) as Post[]);
       } else {

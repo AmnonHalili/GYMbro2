@@ -279,23 +279,26 @@ const CreatePost: React.FC = () => {
       // הדפסת מבנה התשובה לצורכי דיבוג
       console.log('[CreatePost] Post creation response:', response);
       
-      // מנסים לזהות את ה-ID בהתאם למבנה התשובה
-      let postId: string | undefined;
+      // חילוץ מזהה הפוסט שנוצר
+      let postId = '';
       
       // בדיקת מבנה התשובה המעודכן
-      if (response.post && typeof response.post === 'object') {
-        // הפוסט נמצא בשדה post
-        postId = response.post.id || response.post._id;
-        console.log('[CreatePost] Found post ID in response.post:', postId);
-      } else if (response.data && typeof response.data === 'object') {
-        // מבנה ApiResponse<Post> סטנדרטי
-        postId = response.data.id || response.data._id;
-        console.log('[CreatePost] Found post ID in response.data:', postId);
-      } else if (typeof response === 'object') {
-        // ייתכן שהמבנה שונה מהצפוי
-        postId = (response as any).id || (response as any)._id;
-        console.log('[CreatePost] Found post ID directly in response:', postId);
+      if (response && typeof response === 'object') {
+        // ננסה למצוא את המזהה במספר מבנים אפשריים
+        if (response.id) {
+          postId = response.id;
+        } else if (response._id) {
+          postId = response._id;
+        }
       }
+      
+      // אם לא מצאנו מזהה, זו שגיאה
+      if (!postId) {
+        console.error('[CreatePost] Could not extract post ID from response:', response);
+        throw new Error('לא ניתן היה לזהות את מזהה הפוסט שנוצר');
+      }
+
+      console.log('[CreatePost] Post created successfully with ID:', postId);
       
       // ניקוי הטופס אחרי יצירת פוסט בכל מקרה
       setContent('');
@@ -305,7 +308,6 @@ const CreatePost: React.FC = () => {
       
       if (postId) {
         // נווט ישירות לדף הפוסט
-        console.log('[CreatePost] Post created successfully with ID:', postId);
         navigate(`/post/${postId}`, { replace: true });
       } else {
         console.log('[CreatePost] Post created but no ID found. Returning to home page.');

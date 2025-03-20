@@ -1,0 +1,74 @@
+/* סגנונות לתמונת פרופיל ואווטאר אנונימי */
+.profile-image {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-avatar {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-image.show-anonymous .anonymous-avatar-container {
+  display: flex !important;
+}
+
+.anonymous-avatar-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* עיצוב ייחודי לכרטיס פרופיל */
+.profile-card {
+  background-color: var(--surface-color, #fff);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s;
+  overflow: hidden;
+}
+
+.profile-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* עיצוב סטטיסטיקות */
+.user-stat-card {
+  padding: 15px;
+  text-align: center;
+  background-color: var(--surface-alt-color, #f8f9fa);
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.user-stat-card:hover {
+  background-color: var(--surface-hover-color, #e9ecef);
+}
+
+.stat-number {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin-bottom: 0;
+  color: var(--primary-color, #388e3c);
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: var(--text-secondary-color, #6c757d);
+  margin-bottom: 0;
+} 

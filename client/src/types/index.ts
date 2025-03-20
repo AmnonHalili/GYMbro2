@@ -4,7 +4,7 @@ export interface User {
   _id?: string;
   username: string;
   email?: string;
-  profilePicture?: string;
+  profilePicture?: string | null;
   googleId?: string;
 }
 
@@ -41,7 +41,9 @@ export interface Post {
   id: string;
   _id?: string;
   content: string;
-  image?: string;
+  image?: string | { path: string };
+  imageUrl?: string;
+  imageFullPath?: string;
   user: User;
   likesCount: number;
   commentsCount: number;

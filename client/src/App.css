@@ -201,10 +201,11 @@
 
 .post-image {
   width: 100%;
-  max-height: 300px;
-  object-fit: cover;
-  border-radius: 8px;
-  margin-top: auto;
+  max-height: 250px !important;
+  max-width: 500px !important;
+  object-fit: contain !important;
+  border-radius: 8px !important;
+  margin-top: auto !important;
 }
 
 .card-footer {

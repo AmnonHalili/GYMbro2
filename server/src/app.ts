@@ -93,7 +93,31 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // הוספת לוג לבדיקת נתיב התיקייה 
-console.log('Static files path:', path.join(__dirname, '../uploads'));
+console.log('נתיב קבצים סטטיים:', path.join(__dirname, '../uploads'));
+console.log('נתיב מוחלט:', path.resolve(path.join(__dirname, '../uploads')));
+
+// הוספת מידלוואר CORS ייעודי לתמונות
+app.use('/uploads', (req, res, next) => {
+  // כותרות CORS אשר יתירו גישה מכל דומיין
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  // כותרות קריטיות לפתרון בעיות אבטחה וקרוס-אוריג'ין
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Cross-Origin-Embedder-Policy', 'credentialless');
+  next();
+});
+
+// תוספת חדשה - מאפשר גישה ישירה לתמונות במסלול נוסף עם CORS
+app.use('/api/uploads', (req, res, next) => {
+  // הגדרות להתמודדות עם CORS עבור תמונות
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(path.join(__dirname, '../uploads')));
+
+console.log('Added direct image path with CORS headers:', path.join(__dirname, '../uploads'));
 
 // אין צורך בהגדרה נוספת של '/uploads/posts' כי היא כבר נכללת ב-'/uploads'
 // לכן ניתן להסיר את השורה הבאה והלוג שלה
@@ -115,7 +139,7 @@ const asyncWrapper = (fn: (req: Request, res: Response) => Promise<any> | any) =
 const imageRouter = express.Router();
 
 // middleware ייעודי להצגת תמונות עם טיפול בשגיאות
-imageRouter.get('/:folder/:filename', asyncWrapper((req: Request, res: Response) => {
+imageRouter.get('/:folder/:filename', asyncWrapper(async (req: Request, res: Response) => {
   const { folder, filename } = req.params;
   
   // וידוא שמדובר בתיקייה מורשית
@@ -129,6 +153,26 @@ imageRouter.get('/:folder/:filename', asyncWrapper((req: Request, res: Response)
   // בדיקה שהקובץ קיים
   if (!fs.existsSync(filePath)) {
     console.log(`Image not found: ${filePath}`);
+    
+    // אם לא קיים בתיקיית התיקייה הספציפית, ננסה בתיקיית השורש
+    const rootFilePath = path.join(__dirname, '../uploads', filename);
+    if (fs.existsSync(rootFilePath)) {
+      console.log(`Image found in root uploads folder: ${rootFilePath}`);
+      
+      // הוספת כותרות CORS מורחבות
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET');
+      res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.header('Cross-Origin-Embedder-Policy', 'credentialless');
+      
+      // הגדרת Cache-Control לשמירת התמונה בזיכרון המטמון
+      res.header('Cache-Control', 'public, max-age=86400'); // 24 שעות
+      res.header('Content-Type', 'image/jpeg');
+      
+      // שליחת הקובץ
+      return res.sendFile(rootFilePath);
+    }
+    
     return res.status(404).send('Image not found');
   }
   
@@ -138,6 +182,16 @@ imageRouter.get('/:folder/:filename', asyncWrapper((req: Request, res: Response)
     console.log(`Empty image file: ${filePath}`);
     return res.status(404).send('Empty image file');
   }
+  
+  // הוספת כותרות CORS מורחבות
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Cross-Origin-Embedder-Policy', 'credentialless');
+  
+  // הגדרת Cache-Control לשמירת התמונה בזיכרון המטמון
+  res.header('Cache-Control', 'public, max-age=86400'); // 24 שעות
+  res.header('Content-Type', 'image/jpeg');
   
   // שליחת הקובץ
   return res.sendFile(filePath);

@@ -41,7 +41,7 @@ const Login: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      await login({ email, password });
+      await login(email, password);
     } catch (error) {
       console.error('Login error:', error);
     } finally {

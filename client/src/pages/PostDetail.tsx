@@ -110,14 +110,50 @@ const CommentItem: React.FC<CommentItemProps> = ({
       <div className="comment-header">
         <div className="comment-user-info">
           <Link to={`/profile/${comment.user?.id}`}>
-            {comment.user?.profilePicture ? (
+            {comment.user?.profilePicture && typeof comment.user.profilePicture === 'string' ? (
               <img 
                 src={comment.user.profilePicture} 
                 alt={comment.user?.username || 'משתמש'} 
                 className="comment-avatar"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const parent = e.currentTarget.parentElement;
+                  if (parent) {
+                    // יצירת אלמנט אווטאר אנונימי
+                    const avatarContainer = document.createElement('div');
+                    avatarContainer.className = 'anonymous-avatar comment-avatar';
+                    avatarContainer.style.width = '36px';
+                    avatarContainer.style.height = '36px';
+                    avatarContainer.style.background = 'linear-gradient(135deg, #e8f5e9, #2e7d32)';
+                    avatarContainer.style.borderRadius = '50%';
+                    avatarContainer.style.display = 'flex';
+                    avatarContainer.style.alignItems = 'center';
+                    avatarContainer.style.justifyContent = 'center';
+                    avatarContainer.style.flexShrink = '0';
+                    
+                    const avatarSvg = document.createElement('div');
+                    avatarSvg.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>';
+                    
+                    avatarContainer.appendChild(avatarSvg.firstChild as Node);
+                    parent.appendChild(avatarContainer);
+                  }
+                }}
               />
             ) : (
-              <AnonymousAvatar size="sm" className="comment-avatar" />
+              <div className="anonymous-avatar comment-avatar" style={{
+                width: '36px',
+                height: '36px',
+                background: 'linear-gradient(135deg, #e8f5e9, #2e7d32)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
+              </div>
             )}
           </Link>
           
@@ -233,20 +269,15 @@ const PostDetail: React.FC = () => {
       
       try {
         // Fetch post
-        const postData = await postService.getPostById(postId, 5);
+        const postData = await postService.getPostById(postId);
         
         let postObj: Post | null = null;
         
         // נסיון למצוא את אובייקט הפוסט ממספר מבנים אפשריים בתגובה
-        if (postData.data && typeof postData.data === 'object') {
-          console.log('Post found in postData.data');
-          postObj = postData.data as Post;
-        } else if (postData.post && typeof postData.post === 'object') {
-          console.log('Post found in postData.post');
-          postObj = postData.post as Post;
-        } else if (postData && typeof postData === 'object' && (postData as any).content) {
-          console.log('Post found directly in postData');
-          postObj = postData as unknown as Post;
+        if (typeof postData === 'object') {
+          // הפוסט הוא כנראה כבר אובייקט Post תקין שעבר עיבוד בשירות 
+          postObj = postData;
+          console.log('Post object received directly:', postObj);
         }
         
         if (!postObj) {
@@ -277,6 +308,26 @@ const PostDetail: React.FC = () => {
             username: postObj.user.username
           } : 'No user'
         });
+        
+        // בדיקה אם יש מידע על לייק בלוקל סטורג'
+        try {
+          const postUpdates = JSON.parse(localStorage.getItem('postUpdates') || '{}');
+          if (postUpdates[postObj.id]) {
+            // עדכון הלייק והספירה מהלוקל סטורג' אם קיימים
+            if (postUpdates[postObj.id].liked !== undefined) {
+              postObj.liked = postUpdates[postObj.id].liked;
+            }
+            if (postUpdates[postObj.id].likesCount !== undefined) {
+              postObj.likesCount = postUpdates[postObj.id].likesCount;
+            }
+            console.log('Updated post like status from localStorage:', { 
+              liked: postObj.liked, 
+              likesCount: postObj.likesCount 
+            });
+          }
+        } catch (err) {
+          console.error('Failed to load post updates from localStorage', err);
+        }
         
         setPost(postObj);
         
@@ -448,6 +499,20 @@ const PostDetail: React.FC = () => {
           likesCount: newLikesCount
         });
         
+        // שמירת מצב הלייק בלוקל סטורג'
+        try {
+          const postUpdates = JSON.parse(localStorage.getItem('postUpdates') || '{}');
+          postUpdates[postId] = {
+            ...postUpdates[postId] || {},
+            likesCount: newLikesCount,
+            liked: isLiked
+          };
+          localStorage.setItem('postUpdates', JSON.stringify(postUpdates));
+          console.log('Saved like state to localStorage:', { liked: isLiked, likesCount: newLikesCount });
+        } catch (err) {
+          console.error('Failed to store post updates', err);
+        }
+        
         if (isLiked) {
           toast.success('הוספת לייק לפוסט');
         }
@@ -596,26 +661,53 @@ const PostDetail: React.FC = () => {
         <div className="post-detail">
           <div className="post-detail-content">
             <div className="post-detail-user">
-              {post.user && (
-                <Link to={`/profile/${post.user?._id || post.user?.id}`}>
-                  {post.user?.profilePicture ? (
-                    <img 
-                      src={post.user.profilePicture} 
-                      alt={post.user?.username || 'משתמש'} 
-                      className="post-avatar"
-                    />
-                  ) : (
-                    <AnonymousAvatar size="md" className="post-avatar" />
-                  )}
+              <div className="post-author-info">
+                {post.user?.profilePicture && typeof post.user.profilePicture === 'string' ? (
+                  <img
+                    src={post.user.profilePicture}
+                    alt={post.user?.username || 'משתמש'}
+                    className="post-avatar"
+                    onError={(e) => {
+                      console.error('Failed to load profile picture in PostDetail');
+                      e.currentTarget.style.display = 'none';
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        // יצירת אלמנט אווטאר אנונימי חדש במקום
+                        const anonymousAvatar = document.createElement('div');
+                        anonymousAvatar.className = 'post-avatar anonymous-avatar';
+                        anonymousAvatar.style.width = '48px';
+                        anonymousAvatar.style.height = '48px';
+                        anonymousAvatar.style.background = 'linear-gradient(135deg, #e8f5e9, #2e7d32)';
+                        anonymousAvatar.style.borderRadius = '50%';
+                        anonymousAvatar.style.display = 'flex';
+                        anonymousAvatar.style.alignItems = 'center';
+                        anonymousAvatar.style.justifyContent = 'center';
+                        anonymousAvatar.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>';
+                        parent.insertBefore(anonymousAvatar, parent.firstChild);
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="post-avatar anonymous-avatar" style={{
+                    width: '48px',
+                    height: '48px',
+                    background: 'linear-gradient(135deg, #e8f5e9, #2e7d32)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    </svg>
+                  </div>
+                )}
+                <Link to={`/profile/${post.user?._id || post.user?.id}`} style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                  {post.user?.username || 'משתמש אנונימי'}
                 </Link>
-              )}
+              </div>
               
               <div>
-                {post.user && (
-                  <Link to={`/profile/${post.user?._id || post.user?.id}`} className="post-username">
-                    {post.user?.username || 'משתמש'}
-                  </Link>
-                )}
                 <span className="post-date">
                   {post.createdAt ? formatFullDate(post.createdAt) : ''}
                 </span>
@@ -625,7 +717,7 @@ const PostDetail: React.FC = () => {
             {post.image && (
               <div className="post-detail-image-container">
                 <img 
-                  src={post.image} 
+                  src={typeof post.image === 'string' ? post.image : post.image.path} 
                   alt="תוכן הפוסט" 
                   className="post-detail-image"
                   loading="lazy"

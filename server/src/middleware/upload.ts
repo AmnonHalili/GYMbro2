@@ -104,172 +104,135 @@ const createUploadDirs = () => {
 // Initialize directories
 createUploadDirs();
 
-// Configure storage for post images
-const postStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    try {
-      const uploadPath = path.join(__dirname, '../../uploads/posts');
-      console.log(`[upload] Storing post image in: ${uploadPath}`);
-      
-      // Create directory if it doesn't exist
-      if (!fs.existsSync(uploadPath)) {
-        fs.mkdirSync(uploadPath, { recursive: true });
-        console.log(`[upload] Created directory: ${uploadPath}`);
-      }
-      
-      // Set directory permissions
-      try {
-        // Full permissions
-        fs.chmodSync(uploadPath, 0o777);
-        console.log(`[upload] Set permissions for: ${uploadPath} to 777`);
-      } catch (error) {
-        console.error(`[upload] Error setting permissions:`, error);
-      }
-      
-      // Verify directory is writable
-      try {
-        const testFile = path.join(uploadPath, `.write-test-${Date.now()}`);
-        fs.writeFileSync(testFile, 'test');
-        fs.unlinkSync(testFile);
-        console.log(`[upload] Verified write permissions for: ${uploadPath}`);
-        cb(null, uploadPath);
-      } catch (error) {
-        console.error(`[upload] !! CRITICAL ERROR !! Directory not writable:`, error);
-        cb(new Error(`Cannot write to directory: ${uploadPath}`), '');
-      }
-    } catch (err) {
-      console.error(`[upload] Unexpected error in destination handler:`, err);
-      cb(err as any, '');
-    }
-  },
-  filename: (req, file, cb) => {
-    try {
-      // Generate unique filename with timestamp
-      const timestamp = Date.now();
-      // אסירת תווים בעייתיים מהקובץ המקורי
-      const origName = file.originalname || 'unnamed.jpg';
-      const cleanFilename = origName.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const filename = `${timestamp}_${cleanFilename}`;
-      
-      console.log(`[upload] Processing file:`, {
-        originalName: file.originalname,
-        cleanedName: cleanFilename,
-        finalFilename: filename,
-        size: file.size || 'unknown',
-        mimetype: file.mimetype
-      });
-      
-      // Add path info to file object
-      const savedPath = `/uploads/posts/${filename}`;
-      const fullPath = path.join(__dirname, '../../uploads/posts', filename);
-      
-      // Add all paths to file object for later use
-      (file as any).savedPath = savedPath;
-      (file as any).fullPath = fullPath;
-      (file as any).filename = filename;
-      (file as any).destination = path.join(__dirname, '../../uploads/posts');
-      (file as any).imageUrl = `/uploads/posts/${filename}`; // URL for the client
-      
-      // Log for debugging
-      console.log(`[upload] Generated filename: ${filename}, Paths set:`, {
-        savedPath,
-        fullPath,
-        filename
-      });
-      
-      // Store the filename in request for verifyUploadedFile to use
-      (req as any).generatedFilename = filename;
-      (req as any).imagePath = savedPath;
-      
-      cb(null, filename);
-    } catch (error) {
-      console.error(`[upload] Error generating filename:`, error);
-      cb(error as any, '');
-    }
-  }
-});
+// משק בסיסי לבקשה עם קובץ
+export interface RequestWithFile extends Request {
+  file?: Express.Multer.File;
+}
 
-// Configure storage for profile pictures
-const profileStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, '../../uploads/profile');
-    console.log(`[upload] Storing profile picture in: ${uploadPath}`);
-    
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-      console.log(`[upload] Created directory: ${uploadPath}`);
+// וידוא קיום תיקיות העלאה
+const ensureUploadDirs = () => {
+  try {
+    // תיקיית uploads ראשית
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
     }
-    
-    // Verify directory is writable
-    if (!ensureUploadDirectory(uploadPath)) {
-      return cb(new Error(`Cannot write to directory: ${uploadPath}`), '');
-    }
-    
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    const filename = `profile-${uniqueSuffix}${ext}`;
-    
-    console.log(`[upload] Generated filename: ${filename}`);
-    
-    // Add path info to file object
-    (file as any).savedPath = `/uploads/profile/${filename}`;
-    (file as any).fullPath = path.join(__dirname, '../../uploads/profile', filename);
-    
-    cb(null, filename);
-  }
-});
 
-// File filter for images
-const imageFileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  console.log(`[upload] Validating file:`, {
-    originalname: file.originalname,
-    mimetype: file.mimetype,
-    size: file.size
-  });
-  
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (!allowedTypes.includes(file.mimetype)) {
-    console.error(`[upload] Invalid file type: ${file.mimetype}`);
-    return cb(null, false);
+    // תיקיית posts
+    const postsDir = path.join(uploadsDir, 'posts');
+    if (!fs.existsSync(postsDir)) {
+      fs.mkdirSync(postsDir, { recursive: true });
+    }
+
+    // תיקיית profile
+    const profileDir = path.join(uploadsDir, 'profile');
+    if (!fs.existsSync(profileDir)) {
+      fs.mkdirSync(profileDir, { recursive: true });
+    }
+
+    return true;
+  } catch (error) {
+    console.error('שגיאה ביצירת תיקיות העלאה:', error);
+    return false;
   }
-  
-  cb(null, true);
 };
 
-// Override of multer middleware to ensure complete processing
-export const uploadPostImage = multer({
-  storage: postStorage,
-  fileFilter: (req, file, cb: multer.FileFilterCallback) => {
-    console.log(`[upload] Validating file:`, {
-      originalname: file.originalname,
-      mimetype: file.mimetype,
-      size: file.size
-    });
-    
-    // Check file presence
-    if (!file) {
-      console.error(`[upload] No file provided`);
-      return cb(null, false);
-    }
-    
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(file.mimetype)) {
-      console.error(`[upload] Invalid file type: ${file.mimetype}`);
-      return cb(null, false);
-    }
-    
-    console.log(`[upload] File validation successful`);
-    cb(null, true);
+// יצירת אופיין של multer להעלאת תמונות פוסטים
+const postStorage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    // ודא קיום תיקיות
+    ensureUploadDirs();
+    cb(null, path.join(process.cwd(), 'uploads', 'posts'));
   },
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB
-    files: 1
+  filename: function(req, file, cb) {
+    // יצירת שם קובץ ייחודי
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 10);
+    const ext = path.extname(file.originalname) || '.jpg';
+    
+    cb(null, `post-${timestamp}-${randomString}${ext}`);
   }
-}).single('image');
+});
+
+// יצירת אופיין של multer להעלאת תמונות פרופיל
+const profileStorage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    // ודא קיום תיקיות
+    ensureUploadDirs();
+    cb(null, path.join(process.cwd(), 'uploads', 'profile'));
+  },
+  filename: function(req, file, cb) {
+    // יצירת שם קובץ ייחודי
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 10);
+    const ext = path.extname(file.originalname) || '.jpg';
+    
+    cb(null, `profile-${timestamp}-${randomString}${ext}`);
+  }
+});
+
+// פילטר סוגי קבצים מותרים
+const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('סוג קובץ לא מורשה. יש להעלות קבצי תמונה בלבד.'));
+  }
+};
+
+// יצירת מידלוור להעלאת תמונות פוסטים
+export const uploadPostImage = (req: RequestWithFile, res: Response, next: NextFunction) => {
+  const upload = multer({
+    storage: postStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: fileFilter
+  }).single('image');
+
+  upload(req, res, (err) => {
+    if (err) {
+      console.error('שגיאה בהעלאת תמונת פוסט:', err);
+      return res.status(400).json({ message: `שגיאה בהעלאת תמונה: ${err.message}` });
+    }
+
+    // אם הקובץ הועלה בהצלחה, הוסף את הנתיב לבקשה
+    if (req.file) {
+      // קביעת הנתיב לשמירה במסד הנתונים
+      req.body.image = `/uploads/posts/${req.file.filename}`;
+      console.log(`תמונה הועלתה בהצלחה: ${req.file.filename}`);
+      console.log(`נתיב התמונה: ${req.body.image}`);
+    }
+
+    next();
+  });
+};
+
+// יצירת מידלוור להעלאת תמונות פרופיל
+export const uploadProfileImage = (req: RequestWithFile, res: Response, next: NextFunction) => {
+  const upload = multer({
+    storage: profileStorage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: fileFilter
+  }).single('profilePicture');
+
+  upload(req, res, (err) => {
+    if (err) {
+      console.error('שגיאה בהעלאת תמונת פרופיל:', err);
+      return res.status(400).json({ message: `שגיאה בהעלאת תמונת פרופיל: ${err.message}` });
+    }
+
+    // אם הקובץ הועלה בהצלחה, הוסף את הנתיב לבקשה
+    if (req.file) {
+      // קביעת הנתיב לשמירה במסד הנתונים
+      req.body.profilePicture = `/uploads/profile/${req.file.filename}`;
+      console.log(`תמונת פרופיל הועלתה בהצלחה: ${req.file.filename}`);
+      console.log(`נתיב תמונת הפרופיל: ${req.body.profilePicture}`);
+    }
+      
+    next();
+  });
+};
 
 // פונקציית עזר חדשה לבדיקת קבצים לאחר ההעלאה
 export const verifyUploadedFile = (req: Request, res: Response, next: NextFunction) => {
@@ -422,7 +385,7 @@ export const verifyUploadedFile = (req: Request, res: Response, next: NextFuncti
 // Middleware for handling profile picture uploads
 export const uploadProfilePicture = multer({
   storage: profileStorage,
-  fileFilter: imageFileFilter,
+  fileFilter: fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB
     files: 1

@@ -137,552 +137,325 @@ const processPostUserData = (post: any): void => {
   }
 };
 
-// Process post data to consistent format
-export const processPostData = (post: any): void => {
-  if (!post) return;
-  
-  // בדיקה וטיפול בשדה התמונה
-  if (post.image) {
-    // וידוא שיש http או התחלה עם / בנתיב התמונה
-    if (!post.image.startsWith('http') && !post.image.startsWith('/')) {
-      console.log(`[postService] Fixing image path, adding missing prefix: ${post.image}`);
-      post.image = `/${post.image}`;
-    }
-    
-    // הוספת URL מלא עבור תצוגת התמונה
-    if (!post.imageUrl) {
-      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-      post.imageUrl = post.image.startsWith('http') 
-        ? post.image 
-        : `${baseUrl}${post.image}`;
-      console.log(`[postService] Added imageUrl: ${post.imageUrl}`);
-    }
-  } else {
-    // במקרה שאין תמונה, וודא שהשדות ריקים
-    post.image = null;
-    post.imageUrl = null;
-    console.log(`[postService] Post has no image: ${post.id}`);
-  }
-  
-  // Process user data
-  processPostUserData(post);
-};
-
-// Get all posts with pagination
-export const getPosts = async (page: number = 1, limit: number = 10): Promise<ApiResponse<Post[]>> => {
-  if (!ensureValidToken()) {
-    throw new Error('No valid access token available');
-  }
-  
-  try {
-    // console.log(`[postService] Getting posts page ${page}, limit ${limit}`);
-    const response = await api.get(`/posts?page=${page}&limit=${limit}`);
-    const responseData = response.data;
-    
-    // Process post data
-    if (responseData.posts && Array.isArray(responseData.posts)) {
-      console.log(`[postService] Processing ${responseData.posts.length} posts`);
-      
-      // עיבוד מקיף של הפוסטים - כולל טיפול בתמונות
-      responseData.posts.forEach((post: any) => {
-        // בדיקה וטיפול בתמונות - וידוא פורמט אחיד
-        if (post.image) {
-          // הוספת / בהתחלה אם חסר
-          if (!post.image.startsWith('/') && !post.image.startsWith('http')) {
-            post.image = `/${post.image}`;
-          }
-          
-          // הוספת URL מלא לתמונה
-          if (!post.imageUrl) {
-            const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-            post.imageUrl = post.image.startsWith('http') 
-              ? post.image 
-              : `${baseUrl}${post.image}`;
-          }
-        }
-        
-        // עיבוד שאר הנתונים של הפוסט
-        processPostData(post);
-      });
-    } else if (responseData.data && Array.isArray(responseData.data)) {
-      console.log(`[postService] Processing ${responseData.data.length} posts (from data field)`);
-      responseData.data.forEach((post: any) => {
-        processPostData(post);
-      });
-    }
-    
+/**
+ * פונקציית עזר לעיבוד פוסט מהשרת - יוצרת URL תמונה, מטפלת ב-ID תקין וכו'
+ */
+export const processPostData = (post: any): Post => {
+  if (!post) {
+    // יצירת אובייקט ריק שמתאים לטיפוס Post במקום להחזיר null
     return {
-      data: responseData.posts || responseData.data || [],
-      pagination: {
-        total: responseData.totalPosts || 0,
-        page: responseData.currentPage || page,
-        limit: limit,
-        pages: responseData.totalPages || 1
-      },
-      message: 'Posts fetched successfully'
+      id: '',
+      content: '',
+      user: { id: '', username: '' },
+      likesCount: 0,
+      commentsCount: 0,
+      createdAt: new Date().toISOString()
     };
-  } catch (error: any) {
-    console.error('[postService] Error fetching posts:', error);
-    throw new Error(error.response?.data?.message || error.message || 'Error fetching posts');
   }
+  
+  // יוצרים אובייקט פוסט עם id מנורמל ושאר השדות
+  const processedPost: Post = {
+    ...post,
+    id: post._id || post.id, // וידוא שאכן יש id תקין
+    likesCount: typeof post.likesCount === 'number' ? post.likesCount : 0,
+    commentsCount: typeof post.commentsCount === 'number' ? post.commentsCount : 0
+  };
+  
+  // טיפול בתמונות אם קיימות
+  if (post.image) {
+    console.log(`[processPostData] Processing image for post ${processedPost.id}: ${post.image}`);
+    
+    // יצירת URL תמונה מלא
+    const baseUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
+    
+    // בדיקה אם התמונה היא אובייקט או מחרוזת
+    const imagePath = typeof post.image === 'object' && post.image.path 
+      ? post.image.path 
+      : post.image;
+    
+    processedPost.imageUrl = `${baseUrl}${imagePath.startsWith('/') ? imagePath : `/${imagePath}`}`;
+    console.log(`[processPostData] Set image URL to: ${processedPost.imageUrl}`);
+    
+    // הוספת נתיב מלא לתמונה עבור גישה ישירה
+    processedPost.imageFullPath = `${baseUrl}${imagePath.startsWith('/') ? imagePath : `/${imagePath}`}`;
+  } else {
+    console.log(`[processPostData] Post has no image: ${processedPost.id}`);
+  }
+  
+  return processedPost;
 };
 
-// Get posts by user ID
-export const getUserPosts = async (userId: string, page: number = 1, limit: number = 10, maxRetries: number = 3): Promise<ApiResponse<Post[]>> => {
-  let retries = 0;
-  let lastError;
+// Helper function to process post image paths
+const processPostImage = (post: any): void => {
+  if (!post) {
+    console.error('ניסיון לעבד פוסט ריק');
+    return;
+  }
 
-  while (retries < maxRetries) {
-    try {
-      console.log(`[postService] Attempting to fetch posts for user ${userId}, page ${page}, attempt ${retries + 1}/${maxRetries}`);
-      const response = await api.get(`/posts?userId=${userId}&page=${page}&limit=${limit}`);
-      
-      // לוג מפורט של התשובה מהשרת לדיבאג
-      console.log(`[postService] Server response for user posts:`, response.data);
-      
-      // עיבוד התשובה מהשרת ומיפוי לפורמט המוכר למערכת
-      let processedResponse: ApiResponse<Post[]>;
-      
-      // Handle image URLs in each post to ensure they have proper format
-      const processPosts = (posts: any[]) => {
-        return posts.map(post => {
-          processPostData(post);
-          return post;
-        });
-      };
-      
-      // התשובה מהשרת מכילה שדה posts
-      if (response.data && Array.isArray(response.data.posts)) {
-        console.log(`[postService] Successfully fetched ${response.data.posts.length} posts for user ${userId}, page ${page}`);
-        
-        // Process post images
-        const processedPosts = processPosts(response.data.posts);
-        
-        processedResponse = {
-          data: processedPosts,
-          pagination: response.data.pagination
-        };
-      }
-      // פורמט חלופי - אם יש שדה data
-      else if (response.data && Array.isArray(response.data.data)) {
-        console.log(`[postService] Successfully fetched ${response.data.data.length} posts for user ${userId} using data format`);
-        
-        // Process post images
-        const processedPosts = processPosts(response.data.data);
-        
-        processedResponse = {
-          ...response.data,
-          data: processedPosts
-        };
-      } 
-      // פורמט חלופי - אם התשובה היא מערך ישירות
-      else if (Array.isArray(response.data)) {
-        console.log(`[postService] Successfully fetched ${response.data.length} posts for user ${userId} as direct array`);
-        
-        // Process post images
-        const processedPosts = processPosts(response.data);
-        
-        processedResponse = {
-          data: processedPosts,
-          pagination: { 
-            page, 
-            limit, 
-            total: processedPosts.length, 
-            pages: 1 
-          }
-        };
-      } 
-      else {
-        console.warn(`[postService] Invalid response format for user posts:`, response.data);
-        throw new Error(`Invalid response format: expected posts array but got: ${JSON.stringify(response.data)}`);
-      }
-      
-      // לוג התשובה המעובדת לדיבאג
-      console.log('[postService] Processed response for client:', processedResponse);
-      
-      return processedResponse;
-    } catch (error: any) {
-      lastError = error;
-      
-      // הדפס את השגיאה המלאה לדיבאג
-      console.error(`[postService] Error details:`, error);
-      
-      // בעיות רשת או שרת, ננסה שוב
-      if (!error.response || error.code === 'ECONNABORTED' || error.response?.status >= 500) {
-        console.log(`[postService] Network error or server error, retrying (${retries + 1}/${maxRetries})...`);
-        retries++;
-        
-        // המתנה לפני ניסיון נוסף
-        const delay = 500 * retries;
-        console.log(`[postService] Waiting ${delay}ms before next attempt...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      } else {
-        // שגיאה אחרת, כנראה בעיה בפרמטרים
-        console.error(`[postService] Error fetching posts for user ${userId}:`, error.message);
-        throw error;
-      }
+  // וידוא שיש שדה id (במקום _id אם אין id)
+  if (!post.id && post._id) {
+    post.id = post._id;
+  }
+  
+  // טיפול בנתיבי תמונה
+  if (post.image) {
+    // טיפול במקרה שהתמונה היא אובייקט
+    let imagePath: string;
+    if (typeof post.image === 'object' && post.image.path) {
+      imagePath = post.image.path;
+      console.log(`התמונה היא אובייקט עם שדה path: ${imagePath}`);
+    } else if (typeof post.image === 'string') {
+      imagePath = post.image;
+    } else {
+      console.error('פורמט לא תקין של תמונה:', post.image);
+      return;
     }
+    
+    // אם הנתיב לא מתחיל ב-http או /, נוסיף / בהתחלה
+    if (!imagePath.startsWith('http') && !imagePath.startsWith('/')) {
+      imagePath = `/${imagePath}`;
+      console.log(`תיקון נתיב תמונה: ${imagePath}`);
+    }
+    
+    // הוספת שדה imageUrl עם URL מלא של התמונה
+    const baseUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
+    post.imageUrl = imagePath.startsWith('http') 
+      ? imagePath 
+      : `${baseUrl}${imagePath}`;
+    console.log(`[processPostImage] Set image URL to: ${post.imageUrl}`);
+    
+    // הוספת שדה imageFullPath עם URL מלא של התמונה
+    post.imageFullPath = post.imageUrl;
+    console.log(`[processPostImage] Set image full path to: ${post.imageFullPath}`);
   }
   
-  // אם הגענו לכאן, כל הניסיונות נכשלו
-  console.error(`[postService] Failed to fetch posts for user ${userId} after ${maxRetries} retries`);
-  throw lastError;
+  // וידוא שיש אובייקט user תקין
+  if (!post.user || typeof post.user !== 'object') {
+    console.warn('פוסט חסר נתוני משתמש');
+    post.user = { id: 'unknown', username: 'משתמש לא ידוע' };
+  } else if (post.user._id && !post.user.id) {
+    post.user.id = post.user._id;
+  }
 };
 
-// Get post by ID
-export const getPostById = async (postId: string, maxRetries: number = 5): Promise<ApiResponse<Post>> => {
-  if (!ensureValidToken()) {
-    throw new Error('No valid access token available');
+// קבלת כל הפוסטים עם דפדוף
+export const getPosts = async (page: number = 1, limit: number = 10): Promise<{
+  posts: Post[];
+  pagination: Pagination;
+}> => {
+  try {
+    const response = await api.get(`/posts?page=${page}&limit=${limit}`);
+    
+    // עיבוד התשובה ועדכון פורמט התמונה
+    if (response.data.posts && Array.isArray(response.data.posts)) {
+      response.data.posts.forEach((post: any) => {
+        processPostData(post);
+      });
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching posts:', error);
+    return { posts: [], pagination: { total: 0, page: 1, limit: 10, pages: 1 } };
   }
-  
-  console.log(`[postService] Attempting to fetch post ${postId}, attempt 1/${maxRetries}`);
-  
-  let retries = 0;
-  let lastError: any = null;
-  
-  while (retries < maxRetries) {
+};
+
+// קבלת פוסטים לפי משתמש
+export const getUserPosts = async (userId: string, page: number = 1, limit: number = 10): Promise<{
+  posts: Post[];
+  pagination: Pagination;
+}> => {
+  try {
+    const response = await api.get(`/posts/user/${userId}?page=${page}&limit=${limit}`);
+    
+    // עיבוד התמונות בכל פוסט
+    if (response.data.posts && Array.isArray(response.data.posts)) {
+      response.data.posts.forEach((post: any) => {
+        processPostImage(post);
+      });
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error(`שגיאה בטעינת פוסטים של משתמש ${userId}:`, error);
+        throw error;
+  }
+};
+
+// קבלת פוסט בודד לפי מזהה
+export const getPostById = async (postId: string): Promise<Post> => {
     try {
       const response = await api.get(`/posts/${postId}`);
       
-      console.log(`[postService] Successfully fetched post ${postId} on attempt ${retries + 1}`);
-      console.log(`[postService] API response status: ${response.status}`);
-      
-      // בדיקת המבנה של התשובה
-      const responseKeys = Object.keys(response.data);
-      console.log(`[postService] Response structure:`, responseKeys);
-      
-      // הוצאת הפוסט מהתשובה
-      const post = response.data.post;
-      
-      // בדיקה וטיפול בשדה התמונה
-      if (post.image) {
-        // וידוא שמדובר בנתיב תקין (מתחיל ב-/ או http)
-        if (!post.image.startsWith('http') && !post.image.startsWith('/')) {
-          console.log(`[postService] Fixing image path in post ${postId}, adding missing prefix: ${post.image}`);
-          post.image = `/${post.image}`;
-        }
-        
-        // הוספת URL מלא עבור תצוגת התמונה אם לא קיים
-        if (!post.imageUrl) {
-          const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-          post.imageUrl = post.image.startsWith('http') 
-            ? post.image 
-            : `${baseUrl}${post.image}`;
-          console.log(`[postService] Added imageUrl to post ${postId}: ${post.imageUrl}`);
-        }
-      } else {
-        console.log(`[postService] Post has no image: ${postId}`);
-        post.image = null;
-        post.imageUrl = null;
-      }
-      
-      // עיבוד שאר הנתונים של הפוסט
+    if (response.data) {
+      // עיבוד נתיבי תמונה בפוסט
+      const post = response.data.post || response.data;
       processPostData(post);
-      
-      console.log(`[postService] Post details after processing:`, {
-        id: post.id || post._id,
-        content: post.content,
-        imageUrl: post.imageUrl,
-        user: post.user ? {
-          id: post.user.id || post.user._id,
-          username: post.user.username
-        } : null
-      });
-      
-      return {
-        data: post,
-        message: 'Post fetched successfully'
-      };
-    } catch (error: any) {
-      lastError = error;
-      
-      // אם הבעיה היא שהפוסט לא נמצא או תקלת רשת, ננסה שוב
-      if (error.response?.status === 404 || error.code === 'ECONNABORTED' || !error.response) {
-        console.log(`[postService] Post not found or network error, retrying (${retries + 1}/${maxRetries})...`);
-        retries++;
-        
-        // המתנה לפני ניסיון נוסף (500ms * מספר הניסיון)
-        const delay = 500 * retries;
-        console.log(`[postService] Waiting ${delay}ms before next attempt...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      } else {
-        // אם הבעיה אינה 404 או תקלת רשת, נזרוק את השגיאה מיד
-        console.error(`[postService] Error fetching post ${postId}:`, error);
-        throw error;
-      }
+      return post;
     }
+    
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching post ${postId}:`, error);
+    throw error;
   }
-  
-  // אם הגענו לכאן, כל הניסיונות נכשלו
-  console.error(`[postService] Failed to fetch post ${postId} after ${maxRetries} retries`);
-  throw lastError;
 };
 
-// Create a new post
-export const createPost = async (formData: FormData, maxRetries: number = 3): Promise<any> => {
-  console.log('[postService] Starting post creation with valid token');
-  
-  // Log FormData content for debugging
-  console.log('[postService] FormData content check:');
-  Array.from(formData.entries()).forEach(([key, value]) => {
-    if (key === 'content') {
-      console.log('[postService] content:', value);
-    } else if (key === 'image' && value instanceof File) {
-      console.log('[postService] image:', value.name, 'Size:', value.size, 'bytes, Type:', value.type, 'Last Modified:', new Date(value.lastModified));
-    } else if (key === 'userId') {
-      console.log('[postService] userId:', value);
-    }
-  });
-  
-  // Validate image file if present
-  const imageFile = formData.get('image') as File;
-  if (imageFile) {
-    console.log('[postService] Validating image file:', imageFile.name);
+// יצירת פוסט חדש (עם תמונה אופציונלית)
+export const createPost = async (content: string | FormData, image?: File): Promise<Post> => {
+  try {
+    let response;
     
-    // Check file size
-    if (imageFile.size > 5 * 1024 * 1024) {
-      throw new Error('Image file is too large. Maximum size is 5MB.');
-    }
-    
-    // Check file type
-    if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(imageFile.type)) {
-      throw new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.');
-    }
-    
-    // Create a clone of the file for validation
-    try {
-      const fileClone = new File([imageFile], imageFile.name, {
-        type: imageFile.type,
-        lastModified: imageFile.lastModified
+    if (content instanceof FormData) {
+      // אם התוכן הוא כבר FormData, השתמש בו ישירות
+      response = await api.post('/posts', content, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
-      console.log('[postService] Image clone successful, size:', fileClone.size, 'bytes');
-    } catch (error) {
-      console.error('[postService] Error cloning file:', error);
-      throw new Error('Error validating image file');
+    } else {
+      // אחרת, צור FormData חדש
+      const formData = new FormData();
+      formData.append('content', content);
+      
+      if (image) {
+        formData.append('image', image);
+      }
+      
+      response = await api.post('/posts', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
     }
-  }
-  
-  let attempt = 1;
-  let lastError;
-  
-  while (attempt <= maxRetries) {
-    console.log(`[postService] Attempting to create post, attempt ${attempt}/${maxRetries}`);
     
-    try {
-      // Add Authorization header
-      console.log('[postService] Sending request with Authorization header');
-      const response = await api.post('/posts', formData);
-      
-      // Log upload progress
-      console.log('[postService] Upload progress: 100%');
-      
-      // Check response
-      if (response.data) {
-        console.log('[postService] Post creation successful:', response.data);
-        
-        // Process post data
-        const post = response.data.post;
-        if (!post.image && imageFile) {
-          console.log('[postService] Post has no image:', post.id);
-          console.log('[postService] Processed post data:', {
-            id: post.id,
-            imagePath: post.image,
-            imageProcessed: null
-          });
-          console.log('[postService] WARNING: Image was sent but not saved in post');
-          
-          // Try to verify image was saved
-          try {
-            // בדיקה אם התמונה נמצאת בשרת
-            // שימוש בשם הקובץ המקורי במקום בשם המלא (שכולל את timestamp)
-            const filename = encodeURIComponent(imageFile.name);
-            console.log(`[postService] Checking if image exists: ${filename}`);
-            
-            // ניסיון קודם כל עם שם המקורי
-            try {
-              const checkResponse = await api.get(`check-image/posts/${filename}`);
-              if (checkResponse.data && checkResponse.data.exists) {
-                console.log('[postService] Image exists on server:', checkResponse.data);
-                post.image = checkResponse.data.path;
-                return response.data;
-              }
-            } catch (checkError) {
-              console.log(`[postService] Image not found with exact name: ${filename}`);
-            }
-            
-            // אם לא נמצא, ננסה לבדוק את כל הקבצים בתיקייה
-            try {
-              const debugResponse = await api.get('debug/list-images');
-              console.log('[postService] Files in uploads directory:', debugResponse.data);
-              
-              // חיפוש קובץ שמכיל את שם הקובץ המקורי
-              if (debugResponse.data && debugResponse.data.files) {
-                const matchingFile = debugResponse.data.files.find((file: any) => 
-                  file.name.includes(imageFile.name.replace(/\.[^/.]+$/, "")) // שם ללא סיומת
-                );
-                
-                if (matchingFile) {
-                  console.log('[postService] Found matching file:', matchingFile);
-                  post.image = matchingFile.accessibleAt;
+    // עדכון נתיב התמונה אם קיים
+    if (response.data && response.data.post) {
+      processPostData(response.data.post);
+      return response.data.post;
+    } else if (response.data) {
+      processPostData(response.data);
                   return response.data;
                 }
-              }
-            } catch (listError) {
-              console.log('[postService] Error listing image files:', listError);
-            }
-          } catch (error) {
-            console.log('[postService] Error checking image status:', error);
-          }
-        }
-        
-        // Process user data
-        processPostUserData(post);
         
         return response.data;
-      } else {
-        throw new Error('Invalid response from server');
-      }
-    } catch (error: any) {
-      lastError = error;
-      console.error(`[postService] Error creating post (attempt ${attempt}/${maxRetries}):`, error);
-      
-      // Check if we should retry
-      if (attempt < maxRetries && (!error.response || error.response.status >= 500)) {
-        attempt++;
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        continue;
-      }
-      
-      // If we're here, we've either run out of retries or got a non-retryable error
-      throw new Error(error.response?.data?.message || error.message || 'Error creating post');
-    }
+  } catch (error) {
+    console.error('Error creating post:', error);
+    throw error;
   }
-  
-  // If we're here, we've run out of retries
-  throw lastError || new Error('Failed to create post after multiple attempts');
 };
 
-// Update a post
-export const updatePost = async (postId: string, formData: FormData): Promise<ApiResponse<Post>> => {
-  if (!ensureValidToken()) {
-    throw new Error('No valid access token available');
-  }
-  
+// עדכון פוסט קיים
+export const updatePost = async (postId: string, content: string | FormData, image?: File): Promise<Post> => {
   try {
-    console.log(`[postService] Updating post ${postId}`);
+    let response;
     
-    // בדיקת תכולת ה-FormData לפני שליחה לשרת
-    try {
-      console.log('[postService] FormData content for update:');
-      const entries = Array.from(formData.entries());
-      
-      // בדיקת תכולה
-      let hasImage = false;
-      let hasContent = false;
-      let hasRemoveImage = false;
-      
-      for (const pair of entries) {
-        if (pair[0] === 'image' && pair[1] instanceof File) {
-          hasImage = true;
-          console.log(`[postService] ${pair[0]}: ${(pair[1] as File).name}, Size: ${(pair[1] as File).size} bytes, Type: ${(pair[1] as File).type}`);
-          
-          // בדיקה שהקובץ לא ריק
-          if ((pair[1] as File).size === 0) {
-            console.error('[postService] WARNING: Image file is empty (0 bytes)');
-          }
-        } else if (pair[0] === 'content') {
-          hasContent = true;
-          console.log(`[postService] ${pair[0]}: ${String(pair[1]).substring(0, 50)}...`);
-        } else if (pair[0] === 'removeImage') {
-          hasRemoveImage = true;
-          console.log(`[postService] ${pair[0]}: ${pair[1]}`);
+    if (content instanceof FormData) {
+      // אם התוכן הוא כבר FormData, השתמש בו ישירות
+      response = await api.put(`/posts/${postId}`, content, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
         } else {
-          console.log(`[postService] ${pair[0]}: ${pair[1]}`);
-        }
+      // אחרת, צור FormData חדש
+      const formData = new FormData();
+      formData.append('content', content);
+      
+      if (image) {
+        formData.append('image', image);
       }
       
-      // הודעות אזהרה
-      if (!hasContent) {
-        console.warn('[postService] WARNING: FormData is missing required content field');
-      }
-      
-      if (!hasImage && !hasRemoveImage) {
-        console.warn('[postService] NOTE: FormData has no image changes');
-      }
-    } catch (err) {
-      console.error('[postService] Error inspecting FormData:', err);
+      response = await api.put(`/posts/${postId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
     }
     
-    // לא מציינים Content-Type מפורשת - נתן ל-Axios להגדיר אותו אוטומטית
-    // כולל boundary הדרוש עבור FormData
-    const token = localStorage.getItem('accessToken');
-    
-    // לוג לפני שליחת הבקשה
-    console.log(`[postService] Sending PUT request to /posts/${postId} with FormData`);
-    
-    const response = await api.put(`/posts/${postId}`, formData, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      timeout: 30000 // הגדלת timeout לבקשות עם קבצים
-    });
-    
-    console.log(`[postService] Post ${postId} updated successfully:`, response.data);
-    
-    // עיבוד התשובה לפני החזרה
-    let processedResponse = response.data;
-    
-    // בדיקה האם יש פוסט בתשובה שצריך לעבד
-    if (response.data && (response.data.post || response.data.data)) {
-      const post = response.data.post || response.data.data;
-      if (post) {
-        // עיבוד נתוני הפוסט כולל תיקון נתיב התמונה
-        processPostUserData(post);
-        
-        // לוג נוסף אחרי עיבוד
-        console.log(`[postService] Post processed after update:`, {
-          id: post.id || post._id,
-          imageUrl: post.image
-        });
-        
-        processedResponse = {
-          data: post,
-          message: response.data.message || 'Post updated successfully'
-        };
-      }
+    // עדכון נתיב התמונה אם קיים
+    if (response.data && response.data.post) {
+      processPostData(response.data.post);
+      return response.data.post;
+    } else if (response.data) {
+      processPostData(response.data);
+      return response.data;
     }
     
-    return processedResponse;
-  } catch (error: any) {
-    console.error(`[postService] Error updating post ${postId}:`, error);
-    // יותר מידע על השגיאה
-    if (error.response) {
-      console.error(`[postService] Server responded with status ${error.response.status}`);
-      console.error(`[postService] Response data:`, error.response.data);
-      console.error(`[postService] Response headers:`, error.response.headers);
-    } else if (error.request) {
-      console.error(`[postService] No response received from server:`, error.request);
-    } else {
-      console.error(`[postService] Error setting up request:`, error.message);
-    }
+    return response.data;
+  } catch (error) {
+    console.error('Error updating post:', error);
     throw error;
   }
 };
 
-// Delete a post
-export const deletePost = async (postId: string): Promise<ApiResponse<null>> => {
-  if (!ensureValidToken()) {
-    throw new Error('No valid access token available');
-  }
-  
+// מחיקת פוסט
+export const deletePost = async (postId: string): Promise<{ message: string }> => {
   try {
-    console.log(`[postService] Deleting post ${postId}`);
     const response = await api.delete(`/posts/${postId}`);
-    console.log(`[postService] Post ${postId} deleted successfully`);
     return response.data;
-  } catch (error: any) {
-    console.error(`[postService] Error deleting post ${postId}:`, error);
+  } catch (error) {
+    console.error(`שגיאה במחיקת פוסט ${postId}:`, error);
     throw error;
+  }
+};
+
+// קבלת תגובות לפוסט מסוים
+export const getPostComments = async (postId: string, page: number = 1, limit: number = 10): Promise<{
+  comments: Comment[];
+  pagination: Pagination;
+}> => {
+  try {
+    const response = await api.get(`/posts/${postId}/comments?page=${page}&limit=${limit}`);
+    return response.data;
+  } catch (error) {
+    console.error(`שגיאה בטעינת תגובות לפוסט ${postId}:`, error);
+    throw error;
+  }
+};
+
+// הוספת לייק לפוסט
+export const likePost = async (postId: string): Promise<{ message: string; post: Post }> => {
+  try {
+    const response = await api.post(`/posts/${postId}/like`);
+    
+    // עיבוד נתיבי תמונה בפוסט
+    if (response.data.post) {
+      processPostImage(response.data.post);
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error(`שגיאה בהוספת לייק לפוסט ${postId}:`, error);
+    throw error;
+  }
+};
+
+// הסרת לייק מפוסט
+export const unlikePost = async (postId: string): Promise<{ message: string; post: Post }> => {
+  try {
+    const response = await api.delete(`/posts/${postId}/like`);
+    
+    // עיבוד נתיבי תמונה בפוסט
+    if (response.data.post) {
+      processPostImage(response.data.post);
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error(`שגיאה בהסרת לייק מפוסט ${postId}:`, error);
+    throw error;
+  }
+};
+
+// בדיקה האם המשתמש הנוכחי לייק את הפוסט
+export const hasLikedPost = async (postId: string): Promise<boolean> => {
+  try {
+    const response = await api.get(`/posts/${postId}/like`);
+    return response.data.liked;
+  } catch (error) {
+    console.error(`שגיאה בבדיקת לייק לפוסט ${postId}:`, error);
+    return false;
   }
 };
 

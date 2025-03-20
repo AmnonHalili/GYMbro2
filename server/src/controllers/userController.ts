@@ -128,37 +128,88 @@ export const getUserPosts = async (req: Request, res: Response) => {
 // Update user profile
 export const updateProfile = async (req: Request, res: Response) => {
   try {
-    const userFromReq = (req as any).user;
+    console.log('[userController] updateProfile was called with body:', req.body);
+    console.log('[userController] updateProfile request headers:', req.headers);
     
-    if (!userFromReq || !userFromReq._id) {
+    // Extract user ID from request (added by authenticateToken middleware)
+    const userId = req.userId;
+    
+    if (!userId) {
+      console.error('[userController] User not authenticated in updateProfile');
       return res.status(401).json({ message: 'User not authenticated' });
     }
     
-    const userId = userFromReq._id.toString();
-    const { username, bio } = req.body;
+    console.log(`[userController] Updating profile for user ID: ${userId}`);
     
-    // Get fresh user data from database to avoid type issues
+    // Find user by ID
     const user = await User.findById(userId);
+    
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-    // Check if username is already taken
-    if (username && username !== user.username) {
-      const existingUser = await User.findOne({ username });
+    
+    // Update username if provided
+    if (req.body.username) {
+      // Check if username is already taken (but not by current user)
+      const existingUser = await User.findOne({ 
+        username: req.body.username, 
+        _id: { $ne: userId } 
+      });
+      
       if (existingUser) {
-        return res.status(409).json({ message: 'Username is already taken' });
+        return res.status(400).json({ message: 'Username is already taken' });
       }
       
-      user.username = username;
+      user.username = req.body.username;
     }
     
-    // Update bio if provided
-    if (bio !== undefined) {
-      user.bio = bio;
+    // Handle profile picture if uploaded
+    if (req.body.profilePicture) {
+      // If previously set, delete old profile picture (optional)
+      if (user.profilePicture && user.profilePicture !== '/uploads/default.jpg') {
+        try {
+          const oldPicturePath = path.join(process.cwd(), user.profilePicture.replace(/^\//, ''));
+          console.log(`בודק קיום תמונת פרופיל ישנה: ${oldPicturePath}`);
+          
+          if (fs.existsSync(oldPicturePath)) {
+            fs.unlinkSync(oldPicturePath);
+            console.log(`מחקתי תמונת פרופיל ישנה: ${oldPicturePath}`);
+          } else {
+            console.log(`תמונת הפרופיל הישנה לא נמצאה: ${oldPicturePath}`);
+          }
+        } catch (error) {
+          console.error('Error deleting old profile picture:', error);
+          // Continue even if delete fails
+        }
+      }
+      
+      // Set new profile picture path
+      user.profilePicture = req.body.profilePicture;
     }
     
+    // Handle removing profile picture
+    if (req.body.removeProfilePicture === 'true') {
+      if (user.profilePicture && user.profilePicture !== '/uploads/default.jpg') {
+        try {
+          const picturePath = path.join(process.cwd(), user.profilePicture.replace(/^\//, ''));
+          
+          if (fs.existsSync(picturePath)) {
+            fs.unlinkSync(picturePath);
+            console.log(`Deleted profile picture: ${picturePath}`);
+          }
+        } catch (error) {
+          console.error('Error deleting profile picture:', error);
+        }
+      }
+      
+      // Reset to default or empty
+      user.profilePicture = '/uploads/default.jpg';
+    }
+    
+    // Save updated user
     await user.save();
+    
+    console.log(`[userController] User ${userId} profile updated successfully`);
     
     res.status(200).json({
       message: 'Profile updated successfully',
@@ -166,12 +217,11 @@ export const updateProfile = async (req: Request, res: Response) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        bio: user.bio,
         profilePicture: user.profilePicture
       }
     });
   } catch (error) {
-    console.error('Update profile error:', error);
+    console.error('[userController] Update profile error:', error);
     res.status(500).json({ message: 'Server error while updating profile' });
   }
 };
@@ -179,16 +229,14 @@ export const updateProfile = async (req: Request, res: Response) => {
 // Update profile picture
 export const updateProfilePicture = async (req: Request, res: Response) => {
   try {
-    const userFromReq = (req as any).user;
+    const userId = req.userId;
     
-    if (!userFromReq || !userFromReq._id) {
+    if (!userId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
     
-    const userId = userFromReq._id.toString();
-    
-    // Get fresh user data from database
     const user = await User.findById(userId);
+    
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -196,21 +244,33 @@ export const updateProfilePicture = async (req: Request, res: Response) => {
     // Handle profile picture if uploaded
     if (req.file) {
       // Delete old profile picture if exists
-      if (user.profilePicture) {
-        const oldPicturePath = path.join(__dirname, '../../', user.profilePicture);
-        if (fs.existsSync(oldPicturePath)) {
-          fs.unlinkSync(oldPicturePath);
-        }
+      if (user.profilePicture && user.profilePicture !== '/uploads/default.jpg') {
+          const oldPicturePath = path.join(process.cwd(), user.profilePicture.replace(/^\//, ''));
+          console.log(`בודק קיום תמונת פרופיל ישנה: ${oldPicturePath}`);
+          if (fs.existsSync(oldPicturePath)) {
+            fs.unlinkSync(oldPicturePath);
+            console.log(`מחקתי תמונת פרופיל ישנה: ${oldPicturePath}`);
+          } else {
+            console.log(`תמונת הפרופיל הישנה לא נמצאה: ${oldPicturePath}`);
+          }
       }
       
       // Set new profile picture path
       user.profilePicture = `/uploads/profile/${req.file.filename}`;
+      console.log(`נתיב תמונת הפרופיל החדש: ${user.profilePicture}`);
       
+      // Save updated user
       await user.save();
       
-      res.status(200).json({
+      return res.status(200).json({
         message: 'Profile picture updated successfully',
-        profilePicture: user.profilePicture
+        profilePicture: user.profilePicture,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          profilePicture: user.profilePicture
+        }
       });
     } else {
       return res.status(400).json({ message: 'No profile picture uploaded' });

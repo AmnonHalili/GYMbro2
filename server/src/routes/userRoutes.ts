@@ -2,7 +2,7 @@ import express from "express";
 import { body } from 'express-validator';
 import * as userController from '../controllers/userController';
 import { authenticateToken } from '../middleware/auth';
-import { uploadProfilePicture } from '../middleware/upload';
+import { uploadProfilePicture, uploadProfileImage } from '../middleware/upload';
 import { validate } from '../middleware/validation';
 import { Request, Response, NextFunction } from 'express';
 
@@ -321,12 +321,7 @@ router.get('/username/:username', asyncWrapper(userController.getUserByUsername)
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put(
-  '/profile',
-  authenticateToken,
-  validate(profileUpdateValidation),
-  asyncWrapper(userController.updateProfile)
-);
+router.put('/profile', authenticateToken, uploadProfileImage, asyncWrapper(userController.updateProfile));
 
 /**
  * @swagger
@@ -389,11 +384,6 @@ router.put(
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put(
-  '/profile-picture',
-  authenticateToken,
-  uploadProfilePicture,
-  asyncWrapper(userController.updateProfilePicture)
-);
+router.put('/profile-picture', authenticateToken, uploadProfileImage, asyncWrapper(userController.updateProfilePicture));
 
 export default router;

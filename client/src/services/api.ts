@@ -223,45 +223,53 @@ export const callApiWithoutRedirect = async <T>(
 };
 
 /**
- * Creates a full URL for an image path from the server
- * Handles various path formats and ensures proper URL construction
+ * פונקציית עזר לקבלת URL מלא של תמונה
  */
-export const getImageUrl = (imagePath: string | null | undefined): string => {
-  if (!imagePath) {
-    console.warn('[API] Invalid image path:', imagePath);
+export const getImageUrl = (imagePath: string | {path: string}): string => {
+  if (!imagePath) return '';
+  
+  // טיפול במקרה שהתמונה היא אובייקט
+  let normalizedPath: string;
+  if (typeof imagePath === 'object' && imagePath.path) {
+    console.log('[getImageUrl] Image path is an object:', imagePath);
+    normalizedPath = imagePath.path;
+  } else if (typeof imagePath === 'string') {
+    normalizedPath = imagePath;
+  } else {
+    console.error('[getImageUrl] Invalid image path:', imagePath);
     return '';
   }
-
-  // If it's already a full URL, return as is
-  if (imagePath.startsWith('http')) {
-    return imagePath;
-  }
-
-  // Clean the path and ensure it starts with a slash
-  let cleanPath = imagePath.trim();
   
-  // Log the path transformation for debugging
-  console.log('[API] Processing image path:', {
-    original: imagePath,
-    cleaned: cleanPath
-  });
-
-  // Ensure path starts with a slash
-  if (!cleanPath.startsWith('/')) {
-    cleanPath = '/' + cleanPath;
+  console.log('[getImageUrl] Processing path:', normalizedPath);
+  
+  // אם כבר URL מלא, החזר כמו שהוא
+  if (normalizedPath.startsWith('http')) {
+    return normalizedPath;
   }
-
-  // Get the base URL from environment or window origin
-  const serverBase = process.env.REACT_APP_API_URL || window.location.origin;
-  const fullUrl = `${serverBase}${cleanPath}`;
-
-  console.log('[API] Generated image URL:', {
-    serverBase,
-    cleanPath,
-    fullUrl
-  });
-
-  return fullUrl;
+  
+  // וודא שהנתיב מתחיל ב-/
+  const pathWithSlash = normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`;
+  
+  // בנה את ה-URL המלא
+  const baseUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
+  
+  // בדיקה אם הנתיב מכיל כבר את המסלול הנכון לתמונות
+  let fullPath: string;
+  
+  if (pathWithSlash.includes('/uploads/posts/') || pathWithSlash.includes('/uploads/profile/')) {
+    // הנתיב כבר מכיל את המסלול הנכון
+    fullPath = `${baseUrl}${pathWithSlash}`;
+  } else if (pathWithSlash.includes('/posts/') && !pathWithSlash.includes('/uploads/')) {
+    // יש מסלול posts אבל חסר uploads
+    fullPath = `${baseUrl}${pathWithSlash.replace('/posts/', '/uploads/posts/')}`;
+  } else {
+    // נתיב גנרי - מניחים שזו תמונת פוסט
+    const filename = pathWithSlash.split('/').pop();
+    fullPath = `${baseUrl}/uploads/posts/${filename}`;
+  }
+  
+  console.log('[getImageUrl] Returning full URL:', fullPath);
+  return fullPath;
 };
 
 /**

@@ -11,13 +11,15 @@ interface AuthState {
   error: string | null;
 }
 
-interface AuthContextProps {
+export interface AuthContextProps {
   authState: AuthState;
   loadUser: () => Promise<void>;
-  login: (credentials: LoginCredentials) => Promise<void>;
-  register: (credentials: RegisterCredentials) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (username: string, email: string, password: string) => Promise<void>;
   googleLogin: (googleToken: string) => Promise<void>;
   logout: () => void;
+  updateUser: (user: User) => void;
+  refreshToken: () => Promise<boolean>;
 }
 
 // Initial state
@@ -40,7 +42,8 @@ type AuthAction =
   | { type: 'REGISTER_SUCCESS'; payload: User }
   | { type: 'REGISTER_FAIL'; payload: string }
   | { type: 'LOGOUT' }
-  | { type: 'CLEAR_ERRORS' };
+  | { type: 'CLEAR_ERRORS' }
+  | { type: 'UPDATE_USER_INFO'; payload: User };
 
 // Reducer
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
@@ -83,6 +86,11 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       return {
         ...state,
         error: null,
+      };
+    case 'UPDATE_USER_INFO':
+      return {
+        ...state,
+        user: action.payload,
       };
     default:
       return state;
@@ -162,18 +170,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // Login
-  const login = async (credentials: LoginCredentials): Promise<void> => {
+  const login = async (email: string, password: string): Promise<void> => {
     try {
       console.log('Logging in with:', { 
-        email: credentials.email, 
-        passwordLength: credentials.password ? credentials.password.length : 0
+        email: email, 
+        passwordLength: password ? password.length : 0
       });
       
       // ניקוי טוקנים קודמים לפני התחברות
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       
-      const { user, accessToken, refreshToken } = await authService.login(credentials);
+      const { user, accessToken, refreshToken } = await authService.login({ email, password });
       
       if (!accessToken) {
         throw new Error('Login successful but no access token received');
@@ -201,15 +209,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // Register
-  const register = async (credentials: RegisterCredentials): Promise<void> => {
+  const register = async (username: string, email: string, password: string): Promise<void> => {
     try {
-      console.log('Registering new user:', { email: credentials.email, username: credentials.username });
+      console.log('Registering new user:', { email: email, username: username });
       
       // ניקוי טוקנים קודמים לפני הרשמה
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       
-      const { user, accessToken, refreshToken } = await authService.register(credentials);
+      const { user, accessToken, refreshToken } = await authService.register({ username, email, password });
       
       if (!accessToken) {
         throw new Error('Registration successful but no access token received');
@@ -268,6 +276,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // עדכון פרטי המשתמש בקונטקסט לאחר עדכון פרופיל
+  const updateUser = (user: User): void => {
+    console.log('Updating user info in context:', user);
+    // עדכון העתק של user כדי לא לשנות את ה-state ישירות
+    const updatedUser = { ...user };
+    
+    // וודא שכאשר תמונת הפרופיל היא null זה מועבר כראוי
+    if (updatedUser.profilePicture === null || updatedUser.profilePicture === 'default') {
+      updatedUser.profilePicture = null;
+      console.log('User profile picture set to null');
+    }
+    
+    dispatch({ type: 'UPDATE_USER_INFO', payload: updatedUser });
+  };
+
   // Logout
   const logout = (): void => {
     console.log('Logging out user');
@@ -282,6 +305,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     dispatch({ type: 'LOGOUT' });
   };
 
+  const refreshToken = async (): Promise<boolean> => {
+    try {
+      console.log('Refreshing token...');
+      const accessToken = localStorage.getItem('accessToken');
+      const refreshTokenStr = localStorage.getItem('refreshToken');
+      
+      if (!accessToken || !refreshTokenStr) {
+        console.log('No access token or refresh token available when attempting to refresh token');
+        return false;
+      }
+      
+      const refreshed = await authService.refreshToken(refreshTokenStr);
+      
+      if (!refreshed) {
+        throw new Error('Token refresh failed');
+      }
+      
+      console.log('Token refreshed successfully');
+      return true;
+    } catch (error: any) {
+      console.error('Error refreshing token:', error.message);
+      return false;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -291,6 +339,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         register,
         googleLogin,
         logout,
+        updateUser,
+        refreshToken
       }}
     >
       {children}

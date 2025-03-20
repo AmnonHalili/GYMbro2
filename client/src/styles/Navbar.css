@@ -1,0 +1,35 @@
+/* סגנונות לאווטאר בנאבבר */
+.navbar-avatar-container {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+}
+
+.navbar-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-link {
+  display: flex;
+  align-items: center;
+}
+
+.username-text {
+  margin-right: 2px;
+}
+
+/* סגנון האווטאר האנונימי בנאבבר */
+.navbar-avatar-container .anonymous-avatar {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+} 

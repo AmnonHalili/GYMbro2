@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import * as FaIcons from 'react-icons/fa';
+import AnonymousAvatar from './AnonymousAvatar';
+import '../styles/Navbar.css';
 
 const Navbar: React.FC = () => {
   const { authState, logout } = useAuth();
   const { isAuthenticated, user } = authState;
   const navigate = useNavigate();
+  const [imageError, setImageError] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -56,9 +59,24 @@ const Navbar: React.FC = () => {
               </NavLink>
               <NavLink 
                 to={user?.id ? `/profile/${user.id}` : '/profile'} 
-                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+                className={({ isActive }) => isActive ? 'nav-link active profile-link' : 'nav-link profile-link'}
               >
-                {FaIcons.FaUser({ className: "me-1" })} {user?.username || 'פרופיל'}
+                <div className="navbar-avatar-container">
+                  {user?.profilePicture && !imageError ? (
+                    <img 
+                      src={user.profilePicture} 
+                      alt="תמונת פרופיל" 
+                      className="navbar-avatar"
+                      onError={(e) => {
+                        console.log('תמונת פרופיל בנאבבר נכשלה בטעינה:', user.profilePicture);
+                        setImageError(true);
+                      }}
+                    />
+                  ) : (
+                    <AnonymousAvatar size="xs" className="navbar-avatar" />
+                  )}
+                </div>
+                <span className="username-text">{user?.username || 'פרופיל'}</span>
               </NavLink>
               <button onClick={handleLogout} className="nav-link btn-link">
                 {FaIcons.FaSignOutAlt({ className: "me-1" })} התנתק

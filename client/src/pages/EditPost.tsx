@@ -39,13 +39,12 @@ const EditPost: React.FC = () => {
           return;
         }
 
-        // ננסה למצוא את אובייקט הפוסט, בין אם הוא מגיע בשדה data או ישירות
-        const post = response.data || response.post || response;
+        // ננסה למצוא את אובייקט הפוסט
+        const post = response;
         console.log('[EditPost] Post data received:', post);
         
         if (!post || typeof post !== 'object') {
-          console.error('[EditPost] Invalid post data:', post);
-          setError('נתוני הפוסט אינם תקינים');
+          setError('שגיאה בטעינת נתוני הפוסט');
           setLoading(false);
           return;
         }
@@ -86,8 +85,13 @@ const EditPost: React.FC = () => {
         
         if (post.image) {
           console.log('[EditPost] Setting post image:', post.image);
-          setOriginalImage(post.image);
-          setImagePreview(post.image);
+          // בדיקה אם התמונה היא אובייקט עם שדה path או מחרוזת
+          const imagePath = typeof post.image === 'object' && post.image.path 
+            ? post.image.path 
+            : (post.image as string);
+          
+          setOriginalImage(imagePath);
+          setImagePreview(imagePath);
         }
         
       } catch (error) {

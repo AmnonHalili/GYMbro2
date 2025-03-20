@@ -41,7 +41,7 @@ const Register: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      await register({ username, email, password });
+      await register(username, email, password);
     } catch (error) {
       console.error('Registration error:', error);
     } finally {

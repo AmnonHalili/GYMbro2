@@ -51,8 +51,17 @@
 /* User Info and Avatar */
 .post-detail-user {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   margin-bottom: 15px;
+}
+
+.post-author-info {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  margin-bottom: 10px !important;
+  direction: rtl !important;
 }
 
 .post-avatar {
@@ -97,8 +106,9 @@
 }
 
 .post-detail-image {
-  max-width: 100%;
-  height: auto;
+  max-width: 500px !important;
+  max-height: 300px !important;
+  object-fit: contain !important;
   display: block;
 }
 
@@ -151,12 +161,29 @@
   align-items: center;
 }
 
+.comment-avatar-container {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  margin-left: 10px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .comment-avatar {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  margin-left: 10px;
   object-fit: cover;
+}
+
+.comment-user-info .anonymous-avatar {
+  margin: 0;
+  width: 36px !important;
+  height: 36px !important;
 }
 
 .comment-username {
@@ -335,6 +362,11 @@
 .btn-like.liked {
   color: #e91e63;
   border-color: #e91e63;
+}
+
+.btn-like.liked svg {
+  color: #e91e63;
+  fill: #e91e63;
 }
 
 .btn-edit {
@@ -605,4 +637,22 @@
     margin-top: 8px;
     align-self: flex-end;
   }
+}
+
+.comment-avatar-fallback {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  margin-left: 10px;
+  background-color: #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #777;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.comment-avatar-fallback:after {
+  content: "👤";
 } 

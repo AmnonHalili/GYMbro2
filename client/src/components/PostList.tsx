@@ -71,7 +71,7 @@ const PostList: React.FC = () => {
       // קריאה לשירות עם פרמטרים של עמוד ופילטר
       const response = await getPosts(pageNum, 10);
       
-      const newPosts = response.data || [];
+      const newPosts = response.posts || [];
       // מיפוי ועיבוד הפוסטים כדי לוודא שיש להם את כל השדות הנדרשים
       const processedPosts = newPosts.map((post: any) => {
         // וידוא שלפוסט יש גם id וגם _id

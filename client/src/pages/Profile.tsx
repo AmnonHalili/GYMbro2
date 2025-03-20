@@ -6,6 +6,8 @@ import * as postService from '../services/postService';
 import { User, Post } from '../types';
 import * as FaIcons from 'react-icons/fa';
 import PostCard from '../components/PostCard';
+import AnonymousAvatar from '../components/AnonymousAvatar';
+import '../styles/Profile.css';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId?: string }>();
@@ -21,6 +23,7 @@ const Profile: React.FC = () => {
   const [postsError, setPostsError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
 
   // הוספת משתנים לתצוגה ומיון
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -30,58 +33,39 @@ const Profile: React.FC = () => {
 
   // טעינת פרופיל המשתמש
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const fetchUserInfo = async () => {
       setLoading(true);
-      setError(null);
+      setError('');
+
+      const userIdToUse = userId || user?._id;
       
-      try {
-        let userProfile;
-        
-        // בדיקה האם להציג את הפרופיל של המשתמש המחובר או משתמש אחר
-        if (!userId && authState.isAuthenticated && currentUser) {
-          // הצגת פרופיל אישי כשמחוברים
-          userProfile = currentUser;
-          console.log('Using current user profile:', userProfile);
-        } else if (userId) {
-          // הצגת פרופיל לפי מזהה משתמש
-          try {
-            userProfile = await userService.getUserById(userId);
-            console.log('Fetched user profile by ID:', userId);
-          } catch (error: any) {
-            console.error('Error fetching user by ID:', error);
-            if (error.response?.status === 404) {
-              setError(`משתמש עם מזהה ${userId} לא נמצא`);
-            } else {
-              setError('אירעה שגיאה בטעינת פרופיל המשתמש');
-            }
-            setLoading(false);
-            return;
-          }
-        } else if (!authState.isAuthenticated) {
-          // אם לא מחוברים וגם לא ביקשו משתמש ספציפי
-          console.log('User not authenticated, redirecting to login');
-          navigate('/login');
-          return;
-        }
-        
-        if (!userProfile) {
-          setError('לא ניתן לטעון את פרופיל המשתמש');
-          setLoading(false);
-          return;
-        }
-        
-        console.log('Setting user profile:', userProfile);
-        setUser(userProfile);
+      // אם אין מזהה משתמש תקף, אין צורך להמשיך
+      if (!userIdToUse) {
+        setError('מזהה משתמש לא חוקי');
         setLoading(false);
-      } catch (error) {
-        console.error('Error in profile data fetch:', error);
-        setError('אירעה שגיאה בטעינת הפרופיל. אנא נסה שוב מאוחר יותר.');
+        return;
+      }
+
+      try {
+        const fetchedUser = await userService.getUserById(userIdToUse);
+        setUser(fetchedUser);
+        
+        // השג את הפוסטים של המשתמש
+        const postsResponse = await postService.getUserPosts(userIdToUse);
+        setPosts(postsResponse.posts);
+        if (postsResponse.pagination && postsResponse.pagination.pages) {
+          setTotalPages(postsResponse.pagination.pages);
+        }
+      } catch (err) {
+        console.error('שגיאה בטעינת פרופיל משתמש:', err);
+        setError('שגיאה בטעינת פרופיל משתמש');
+      } finally {
         setLoading(false);
       }
     };
-    
-    fetchUserProfile();
-  }, [userId, authState.isAuthenticated, currentUser, navigate]);
+
+    fetchUserInfo();
+  }, [userId, user?._id]);
 
   // טעינת הפוסטים של המשתמש - בנפרד מטעינת המשתמש
   useEffect(() => {
@@ -93,24 +77,29 @@ const Profile: React.FC = () => {
       setPage(1);
       
       try {
-        console.log('Fetching posts for user ID:', user.id);
-        const response = await postService.getUserPosts(user.id, 1);
+        // בדיקה מהו המזהה הנכון לשימוש - id או _id
+        const userIdToUse = user.id || user._id || '';
+        if (!userIdToUse) {
+          throw new Error('מזהה משתמש חסר');
+        }
+        console.log('Fetching posts for user ID:', userIdToUse);
+        const response = await postService.getUserPosts(userIdToUse, 1);
         console.log('User posts response processed by service:', response);
         
         // בדיקה שיש נתונים תקינים
-        if (response && Array.isArray(response.data)) {
-          console.log(`Setting ${response.data.length} posts for display`);
-          setPosts(response.data);
+        if (response && Array.isArray(response.posts)) {
+          console.log(`Setting ${response.posts.length} posts for display`);
+          setPosts(response.posts);
           
           // בדיקה אם יש עוד עמודים
           const hasMorePages = response.pagination && response.pagination.pages 
-            ? response.pagination.pages > 1 
+            ? page < response.pagination.pages 
             : false;
-          console.log('Has more pages:', hasMorePages, response.pagination);
+            
           setHasMore(hasMorePages);
           
           // יכול להיות שאין פוסטים בכלל
-          if (response.data.length === 0) {
+          if (response.posts.length === 0) {
             console.log('No posts found for this user');
           }
         } else {
@@ -140,13 +129,17 @@ const Profile: React.FC = () => {
     
     try {
       const nextPage = page + 1;
-      console.log(`Loading more posts for user ${user.id}, page ${nextPage}`);
-      const response = await postService.getUserPosts(user.id, nextPage);
+      const userIdToUse = user.id || user._id || '';
+      if (!userIdToUse) {
+        throw new Error('מזהה משתמש חסר');
+      }
+      console.log(`Loading more posts for user ${userIdToUse}, page ${nextPage}`);
+      const response = await postService.getUserPosts(userIdToUse, nextPage);
       
       // בדיקה שיש נתונים תקינים
-      if (response && Array.isArray(response.data)) {
-        console.log(`Adding ${response.data.length} more posts`);
-        setPosts(prevPosts => [...prevPosts, ...response.data]);
+      if (response && Array.isArray(response.posts)) {
+        console.log(`Adding ${response.posts.length} more posts`);
+        setPosts(prevPosts => [...prevPosts, ...response.posts]);
         setPage(nextPage);
         
         // בדיקה אם יש עוד עמודים
@@ -191,6 +184,46 @@ const Profile: React.FC = () => {
     });
   };
 
+  // פונקציה לקבלת URL של תמונת הפרופיל
+  const getProfilePictureUrl = (): string | null => {
+    // אם אין משתמש, אין תמונה
+    if (!user) {
+      return null;
+    }
+    
+    const { profilePicture } = user;
+    
+    // אם אין תמונת פרופיל בכלל
+    if (!profilePicture) {
+      console.log('אין תמונת פרופיל למשתמש:', user.username);
+      return null;
+    }
+    
+    // אם התמונה היא מחרוזת
+    if (typeof profilePicture === 'string') {
+      return profilePicture;
+    }
+    
+    // אם התמונה היא אובייקט
+    if (typeof profilePicture === 'object' && profilePicture !== null) {
+      console.log('תמונת פרופיל היא אובייקט:', profilePicture);
+      
+      // בדיקה אם יש שדה path
+      if ('path' in profilePicture && typeof (profilePicture as any).path === 'string') {
+        return (profilePicture as any).path;
+      }
+      
+      // בדיקה אם יש שדה url
+      if ('url' in profilePicture && typeof (profilePicture as any).url === 'string') {
+        return (profilePicture as any).url;
+      }
+    }
+    
+    // אם הגענו לכאן, לא הצלחנו לחלץ URL תקין
+    console.warn('לא ניתן לחלץ URL תקין מתמונת הפרופיל:', profilePicture);
+    return null;
+  };
+
   // רינדור הממשק בזמן טעינת המשתמש
   if (loading) {
     return (
@@ -217,19 +250,103 @@ const Profile: React.FC = () => {
         <div className="card-body">
           <div className="row align-items-center">
             <div className="col-md-3 text-center">
-              {user.profilePicture ? (
-                <img
-                  src={user.profilePicture}
-                  alt={user.username}
-                  className="rounded-circle avatar-lg"
-                  style={{ width: '150px', height: '150px', objectFit: 'cover' }}
-                />
-              ) : (
-                <div className="bg-light rounded-circle d-flex align-items-center justify-content-center mx-auto" 
-                     style={{ width: '150px', height: '150px' }}>
-                  <span className="text-secondary">{FaIcons.FaUser({ size: 50 })}</span>
+              <div className="profile-image mb-3">
+                <div className="profile-avatar-container">
+                  {(() => {
+                    // נבדוק אם יש תמונת פרופיל תקינה
+                    const profileUrl = getProfilePictureUrl();
+                    
+                    // במקרה של תמונת פרופיל תקינה, מציגים אותה
+                    if (profileUrl) {
+                      return (
+                        <img 
+                          src={profileUrl} 
+                          alt={user?.username || 'משתמש'} 
+                          className="profile-avatar"
+                          onError={(e) => {
+                            console.log('שגיאה בטעינת תמונת פרופיל:', e);
+                            
+                            // מסתירים את התמונה שנכשלה
+                            e.currentTarget.style.display = 'none';
+                            
+                            // מציגים אווטאר אנונימי במקומה
+                            const parent = e.currentTarget.parentElement;
+                            if (parent) {
+                              // יוצרים תוכן חדש עם האווטאר
+                              const fallbackDiv = document.createElement('div');
+                              fallbackDiv.className = 'profile-avatar-fallback';
+                              fallbackDiv.style.display = 'flex';
+                              fallbackDiv.style.justifyContent = 'center';
+                              fallbackDiv.style.alignItems = 'center';
+                              fallbackDiv.style.width = '150px';
+                              fallbackDiv.style.height = '150px';
+                              
+                              // מרנדרים את האווטאר האנונימי לתוך הדיב
+                              const tempDiv = document.createElement('div');
+                              tempDiv.innerHTML = `
+                                <div style="
+                                  width: 64px;
+                                  height: 64px;
+                                  background: linear-gradient(135deg, #e8f5e9, #2e7d32);
+                                  border-radius: 50%;
+                                  display: flex;
+                                  align-items: center;
+                                  justify-content: center;
+                                  flex-shrink: 0;
+                                  border: 1px solid rgba(0,0,0,0.1);
+                                  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                                ">
+                                  <svg
+                                    width="38.4"
+                                    height="38.4"
+                                    viewBox="0 0 24 24"
+                                    fill="white"
+                                  >
+                                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                                  </svg>
+                                </div>
+                              `;
+                              
+                              // מוסיפים את האווטאר לדיב
+                              fallbackDiv.appendChild(tempDiv.firstElementChild!);
+                              
+                              // מוסיפים את הדיב למסמך
+                              parent.appendChild(fallbackDiv);
+                            }
+                          }}
+                        />
+                      );
+                    }
+                    
+                    // אם אין תמונת פרופיל תקינה, מציגים ישר אווטאר אנונימי
+                    return (
+                      <div className="profile-avatar-fallback" style={{display: 'flex', justifyContent: 'center', alignItems: 'center', width: '150px', height: '150px'}}>
+                        <div style={{
+                          width: '64px',
+                          height: '64px',
+                          background: 'linear-gradient(135deg, #e8f5e9, #2e7d32)',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          border: '1px solid rgba(0,0,0,0.1)',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        }}>
+                          <svg
+                            width={38.4}
+                            height={38.4}
+                            viewBox="0 0 24 24"
+                            fill="white"
+                          >
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                          </svg>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-              )}
+              </div>
             </div>
             
             <div className="col-md-9">

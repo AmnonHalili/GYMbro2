@@ -1,0 +1,74 @@
+/* מיכל תמונת הפרופיל */
+.post-avatar-container {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-left: 10px;
+  background-color: var(--primary-light, #e8f5e9);
+}
+
+/* כשיש שגיאת טעינת תמונה - מציג את האווטאר האנונימי */
+.post-avatar-container.show-anonymous .post-avatar-fallback {
+  display: flex !important;
+}
+
+/* תמונת אווטאר */
+.post-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* עיצוב ספציפי לאווטאר האנונימי */
+.post-avatar-fallback {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: var(--primary-light, #e8f5e9);
+}
+
+/* הגדרות עבור תוכן הפוסט */
+.post-content {
+  margin-bottom: 2px !important;
+  min-height: 20px;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+/* הגדרות עבור כרטיס הפוסט */
+.card-body {
+  padding: 1rem;
+  padding-bottom: 0.5rem;
+}
+
+.card-footer {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 0;
+}
+
+/* הנמכת הפער בין תוכן הפוסט לכפתורי האינטראקציה */
+.post-interactions {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-top: 0;
+}
+
+/* סגנון ללייקים */
+.btn-interaction.like.active .icon {
+  color: #dc3545 !important;
+}
+
+.btn-interaction.like.active:hover .icon {
+  color: #b02a37 !important;
+} 
