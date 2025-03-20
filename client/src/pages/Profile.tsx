@@ -6,8 +6,12 @@ import * as postService from '../services/postService';
 import { User, Post } from '../types';
 import * as FaIcons from 'react-icons/fa';
 import PostCard from '../components/PostCard';
+<<<<<<< HEAD
 import AnonymousAvatar from '../components/AnonymousAvatar';
 import '../styles/Profile.css';
+=======
+import Chat from '../components/Chat/Chat';
+>>>>>>> 23761bd470e744bbadff045868c99f15de28739a
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId?: string }>();
@@ -23,7 +27,11 @@ const Profile: React.FC = () => {
   const [postsError, setPostsError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+<<<<<<< HEAD
   const [totalPages, setTotalPages] = useState(1);
+=======
+  const [showChat, setShowChat] = useState(false);
+>>>>>>> 23761bd470e744bbadff045868c99f15de28739a
 
   // הוספת משתנים לתצוגה ומיון
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -373,159 +381,100 @@ const Profile: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
-              {isOwnProfile && (
-                <Link to="/edit-profile" className="btn btn-outline-primary">
-                  <span className="me-2">{FaIcons.FaEdit({})}</span> ערוך פרופיל
-                </Link>
-              )}
+
+              {/* כפתורי פעולה */}
+              <div className="d-flex gap-2">
+                {isOwnProfile ? (
+                  <Link to="/profile/edit" className="btn btn-primary">
+                    ערוך פרופיל
+                  </Link>
+                ) : (
+                  <>
+                    <button 
+                      className="btn btn-primary"
+                      onClick={() => setShowChat(!showChat)}
+                    >
+                      {showChat ? 'סגור צ׳אט' : 'צ׳אט'}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-      
-      {/* כותרת ואפשרויות */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h3>הפוסטים של {user.username}</h3>
-        
-        <div className="d-flex">
-          {/* כפתור יצירת פוסט חדש */}
-          {isOwnProfile && (
-            <Link to="/create-post" className="btn btn-success btn-sm me-2">
-              <span className="me-1">{FaIcons.FaPlus({})}</span> פוסט חדש
-            </Link>
+
+      {/* אזור הצ'אט */}
+      {showChat && currentUser && (
+        <div className="card shadow-sm mb-4">
+          <div className="card-body">
+            <Chat targetUserId={user.id} />
+          </div>
+        </div>
+      )}
+
+      {/* אזור הפוסטים */}
+      <div className="card shadow-sm">
+        <div className="card-body">
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <h3 className="mb-0">הפוסטים של {user.username}</h3>
+            <div className="d-flex gap-2">
+              <select
+                className="form-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'popular')}
+              >
+                <option value="newest">החדשים ביותר</option>
+                <option value="oldest">הישנים ביותר</option>
+                <option value="popular">הפופולריים ביותר</option>
+              </select>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="חיפוש בפוסטים..."
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {loadingPosts ? (
+            <div className="d-flex justify-content-center">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">טוען פוסטים...</span>
+              </div>
+            </div>
+          ) : postsError ? (
+            <div className="alert alert-danger">{postsError}</div>
+          ) : filteredAndSortedPosts.length === 0 ? (
+            <div className="text-center text-muted">
+              {isOwnProfile ? 'אין לך עדיין פוסטים. צור פוסט חדש!' : 'אין פוסטים עדיין'}
+            </div>
+          ) : (
+            <>
+              <div className={`row ${viewMode === 'grid' ? 'g-4' : ''}`}>
+                {filteredAndSortedPosts.map(post => (
+                  <div key={post.id} className={viewMode === 'grid' ? 'col-md-4' : 'col-12'}>
+                    <PostCard post={post} />
+                  </div>
+                ))}
+              </div>
+
+              {hasMore && (
+                <div className="text-center mt-4">
+                  <button
+                    className="btn btn-outline-primary"
+                    onClick={loadMorePosts}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? 'טוען...' : 'טען עוד'}
+                  </button>
+                </div>
+              )}
+            </>
           )}
-          
-          {/* אפשרויות תצוגה */}
-          <div className="btn-group me-2">
-            <button 
-              type="button" 
-              className={`btn btn-sm ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setViewMode('grid')}
-              aria-label="תצוגת רשת"
-            >
-              <span>{FaIcons.FaThLarge({})}</span>
-            </button>
-            <button 
-              type="button" 
-              className={`btn btn-sm ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setViewMode('list')}
-              aria-label="תצוגת רשימה"
-            >
-              <span>{FaIcons.FaList({})}</span>
-            </button>
-          </div>
-          
-          {/* תיבת מיון */}
-          <select 
-            className="form-select form-select-sm" 
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'popular')}
-            aria-label="מיון פוסטים"
-          >
-            <option value="newest">הכי חדש</option>
-            <option value="oldest">הכי ישן</option>
-            <option value="popular">הכי פופולרי</option>
-          </select>
         </div>
       </div>
-      
-      {/* תיבת חיפוש */}
-      <div className="mb-4">
-        <div className="input-group">
-          <input
-            type="text"
-            className="form-control"
-            placeholder="חפש בפוסטים..."
-            value={filterText}
-            onChange={(e) => setFilterText(e.target.value)}
-            aria-label="חיפוש בפוסטים"
-          />
-          <button 
-            className="btn btn-outline-secondary"
-            onClick={() => setFilterText('')}
-            disabled={!filterText}
-            aria-label="נקה חיפוש"
-          >
-            נקה
-          </button>
-        </div>
-      </div>
-      
-      {/* הצגת מצב טעינת פוסטים */}
-      {loadingPosts && (
-        <div className="text-center my-4">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">טוען פוסטים...</span>
-          </div>
-          <p className="mt-2">טוען את הפוסטים של {user.username}...</p>
-        </div>
-      )}
-      
-      {/* הצגת שגיאה בטעינת פוסטים */}
-      {postsError && (
-        <div className="alert alert-warning text-center my-4">
-          <p>{postsError}</p>
-          <button 
-            className="btn btn-outline-primary mt-2"
-            onClick={() => window.location.reload()}
-          >
-            נסה שוב
-          </button>
-        </div>
-      )}
-      
-      {/* תצוגת פוסטים */}
-      {!loadingPosts && !postsError && (
-        filteredAndSortedPosts.length === 0 ? (
-          <div className="alert alert-info text-center">
-            {posts.length === 0 
-              ? (isOwnProfile 
-                  ? 'עדיין לא פרסמת פוסטים. התחל לשתף את החוויות שלך!' 
-                  : `${user.username} עדיין לא פרסם/ה פוסטים.`)
-              : 'לא נמצאו פוסטים התואמים את החיפוש שלך'}
-          </div>
-        ) : (
-          <>
-            {viewMode === 'grid' ? (
-              <div className="row">
-                {filteredAndSortedPosts.map(post => (
-                  <div key={post.id || post._id} className="col-md-6 col-lg-4 mb-4">
-                    <PostCard post={post} />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="post-list">
-                {filteredAndSortedPosts.map(post => (
-                  <div key={post.id || post._id} className="mb-3">
-                    <PostCard post={post} />
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            {hasMore && (
-              <div className="text-center my-4">
-                <button 
-                  className="btn btn-primary" 
-                  onClick={loadMorePosts}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                      טוען...
-                    </>
-                  ) : (
-                    'טען עוד פוסטים'
-                  )}
-                </button>
-              </div>
-            )}
-          </>
-        )
-      )}
     </div>
   );
 };

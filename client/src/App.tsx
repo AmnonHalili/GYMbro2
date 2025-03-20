@@ -21,6 +21,7 @@ import EditPost from './pages/EditPost';
 import NutritionAdvice from './pages/NutritionAdvice';
 import NutritionalCalculator from './pages/NutritionalCalculator';
 import WorkoutPlanner from './pages/WorkoutPlanner';
+import Chat from './components/Chat/Chat';
 
 // Import Components
 import Layout from './components/Layout';
@@ -87,6 +88,13 @@ const App: React.FC = () => {
           <Route path="/workout-planner" element={
             <PrivateRoute>
               <WorkoutPlanner />
+            </PrivateRoute>
+          } />
+
+          {/* Chat Route - Protected */}
+          <Route path="/chat" element={
+            <PrivateRoute>
+              <Chat />
             </PrivateRoute>
           } />
           
