@@ -11,6 +11,8 @@ import apiRoutes from './routes';
 import passport from 'passport';
 import './config/passport';
 import fs from 'fs';
+import { createServer } from 'http';
+import { initializeSocket } from './socket/chat';
 
 // Load environment variables
 dotenv.config();
@@ -18,6 +20,12 @@ dotenv.config();
 // Initialize Express app
 const app: Express = express();
 const port = process.env.PORT || 5000;
+
+// Create HTTP server
+const httpServer = createServer(app);
+
+// Initialize Socket.IO
+const io = initializeSocket(httpServer);
 
 // Middleware
 app.use(cors({
@@ -102,7 +110,7 @@ try {
 
 // Start server
 connectDB().then(() => {
-  app.listen(port, () => {
+  httpServer.listen(port, () => {
     console.log(`Server running on port ${port}`);
   });
 });

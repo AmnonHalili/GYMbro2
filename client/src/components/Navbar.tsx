@@ -55,6 +55,12 @@ const Navbar: React.FC = () => {
                 מחשבון תזונה
               </NavLink>
               <NavLink 
+                to="/chat" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                {FaIcons.FaComments({ className: "me-1" })} צ'אט
+              </NavLink>
+              <NavLink 
                 to={user?.id ? `/profile/${user.id}` : '/profile'} 
                 className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
               >

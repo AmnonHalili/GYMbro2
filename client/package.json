@@ -20,7 +20,7 @@
     "@types/react-icons": "^2.2.7",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@types/react-toastify": "^4.0.2",
-    "axios": "^1.6.7",
+    "axios": "^1.8.4",
     "bootstrap": "^5.3.3",
     "date-fns": "^4.1.0",
     "jwt-decode": "^4.0.0",
@@ -33,6 +33,7 @@
     "react-scripts": "5.0.1",
     "react-syntax-highlighter": "^15.6.1",
     "react-toastify": "^11.0.5",
+    "socket.io-client": "^4.7.2",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },
@@ -60,5 +61,8 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:5000"
+  "proxy": "http://localhost:5000",
+  "devDependencies": {
+    "@types/socket.io-client": "^3.0.0"
+  }
 }
