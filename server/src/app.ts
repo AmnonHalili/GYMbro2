@@ -11,6 +11,7 @@ import userRoutes from './routes/userRoutes';
 import aiRoutes from './routes/aiRoutes';
 import commentRoutes from './routes/commentRoutes';
 import likeRoutes from './routes/likeRoutes';
+import searchRoutes from './routes/searchRoutes';
 import { errorHandler } from './middleware/errorMiddleware';
 import fs from 'fs';
 import { fixEmptyImageFiles } from './middleware/upload';
@@ -208,6 +209,13 @@ imageCheckRouter.get('/:folder/:filename', asyncWrapper(async (req: Request, res
 // רישום כל נתיבי ה-API תחת הקידומת /api/
 app.use('/api/check-image', imageCheckRouter);
 app.use('/api/image', imageRouter);
+app.use('/api/auth', authRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/likes', likeRoutes);
+app.use('/api/search', searchRoutes);
 
 // אנדפוינט לתיקון תמונות ריקות
 app.post('/api/fix-empty-images', asyncWrapper(async (req: Request, res: Response) => {
@@ -429,6 +437,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/likes', likeRoutes);
+app.use('/api/search', searchRoutes);
 
 // Error handling
 app.use(errorHandler);

@@ -172,7 +172,7 @@ describe('User Profile API', () => {
         .expect(401);
 
       expect(response.body).toHaveProperty('message');
-      expect(response.body.message).toContain('No authentication token provided');
+      expect(response.body.message).toContain('Access token is required');
     });
   });
 
@@ -196,7 +196,7 @@ describe('User Profile API', () => {
         .expect(401);
 
       expect(response.body).toHaveProperty('message');
-      expect(response.body.message).toContain('No authentication token provided');
+      expect(response.body.message).toContain('Access token is required');
     });
   });
 });

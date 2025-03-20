@@ -99,7 +99,7 @@ describe('Delete Post API', () => {
 
     expect(response.body).toHaveProperty('message');
     // עדכון ההודעה המדויקת שהשרת מחזיר
-    expect(response.body.message).toContain('No authentication token provided');
+    expect(response.body.message).toContain('Access token is required');
     
     // Verify post was not deleted
     const post = await Post.findById(testPost._id);

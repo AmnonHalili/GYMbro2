@@ -49,8 +49,8 @@ describe('Like Tests', () => {
       .post(`/api/likes/post/${postId}`)
       .set('Authorization', `Bearer ${accessToken}`);
 
-    // השרת מחזיר 200 במקום 403
-    expect(response.status).toBe(200);
+    // השרת מחזיר סטטוס 201 עבור יצירת לייק חדש
+    expect(response.status).toBe(201);
     
     // וידוא שהלייק נשמר במסד הנתונים
     const like = await Like.findOne({ post: postId, user: userId });

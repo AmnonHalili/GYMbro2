@@ -14,7 +14,12 @@ let accessToken: string;
 let anotherAccessToken: string;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
+  mongoServer = await MongoMemoryServer.create({
+    instance: {
+      port: 27021, // Unique port different from other test files
+      storageEngine: 'ephemeralForTest'
+    }
+  });
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri);
 
@@ -39,22 +44,34 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  // Create a test post before each test
-  testPost = new Post({
-    user: testUser._id,
-    content: 'Test post for likes'
-  });
-  await testPost.save();
+  try {
+    // Create a test post before each test
+    testPost = new Post({
+      user: testUser._id,
+      content: 'Test post for likes'
+    });
+    await testPost.save();
+  } catch (error) {
+    console.error('Error in beforeEach:', error);
+  }
 });
 
 afterEach(async () => {
-  await Post.deleteMany({});
+  try {
+    await Post.deleteMany({});
+  } catch (error) {
+    console.error('Error in afterEach:', error);
+  }
 });
 
 afterAll(async () => {
-  await User.deleteMany({});
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  try {
+    await User.deleteMany({});
+    await mongoose.disconnect();
+    await mongoServer.stop();
+  } catch (error) {
+    console.error('Error in afterAll:', error);
+  }
 });
 
 describe('Toggle Like API', () => {

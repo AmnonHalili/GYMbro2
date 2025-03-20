@@ -74,28 +74,35 @@ describe('Search API', () => {
     test('should find users by username fragment', async () => {
       const query = 'fit';
       
-      // נתיב החיפוש אינו קיים במערכת, לכן מצפים לתגובת 404
+      // Route is now implemented
       const response = await request(app)
         .get(`/api/search/users?q=${query}`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(404);
+        .expect(200);
+      
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.length).toBeGreaterThan(0);
+      expect(response.body.some((user: any) => user.username.toLowerCase().includes('fit'))).toBe(true);
     });
 
     test('should return empty array for no matches', async () => {
       const query = 'nonexistentusername';
       
-      // נתיב החיפוש אינו קיים במערכת, לכן מצפים לתגובת 404
+      // Route is now implemented
       const response = await request(app)
         .get(`/api/search/users?q=${query}`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(404);
+        .expect(200);
+      
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.length).toBe(0);
     });
 
     test('should return 401 if user is not authenticated', async () => {
-      // נתיב החיפוש אינו קיים במערכת, לכן מצפים לתגובת 404
+      // Route is now implemented, expect 401 for unauthorized access
       const response = await request(app)
         .get('/api/search/users?q=test')
-        .expect(404);
+        .expect(401);
     });
   });
 
@@ -103,31 +110,41 @@ describe('Search API', () => {
     test('should find posts by content fragment', async () => {
       const query = 'workout';
       
-      // נתיב החיפוש אינו קיים במערכת, לכן מצפים לתגובת 404
+      // Route is now implemented
       const response = await request(app)
         .get(`/api/search/posts?q=${query}`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(404);
+        .expect(200);
+      
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.length).toBeGreaterThan(0);
+      expect(response.body.some((post: any) => post.content.toLowerCase().includes('workout'))).toBe(true);
     });
 
     test('should return empty array for no matches', async () => {
       const query = 'nonexistentcontent';
       
-      // נתיב החיפוש אינו קיים במערכת, לכן מצפים לתגובת 404
+      // Route is now implemented
       const response = await request(app)
         .get(`/api/search/posts?q=${query}`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(404);
+        .expect(200);
+      
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.length).toBe(0);
     });
 
     test('should respect limit parameter', async () => {
       const limit = 2;
       
-      // נתיב החיפוש אינו קיים במערכת, לכן מצפים לתגובת 404
+      // Route is now implemented
       const response = await request(app)
         .get(`/api/search/posts?q=health&limit=${limit}`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(404);
+        .expect(200);
+      
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.length).toBeLessThanOrEqual(limit);
     });
   });
 
@@ -135,21 +152,35 @@ describe('Search API', () => {
     test('should search both users and posts', async () => {
       const query = 'health';
       
-      // נתיב החיפוש אינו קיים במערכת, לכן מצפים לתגובת 404
+      // Route is now implemented
       const response = await request(app)
         .get(`/api/search?q=${query}`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(404);
+        .expect(200);
+      
+      expect(response.body).toHaveProperty('users');
+      expect(response.body).toHaveProperty('posts');
+      expect(Array.isArray(response.body.users)).toBe(true);
+      expect(Array.isArray(response.body.posts)).toBe(true);
+      // Check if we found at least something in either category
+      expect(response.body.users.length + response.body.posts.length).toBeGreaterThan(0);
     });
 
     test('should return empty arrays for no matches', async () => {
       const query = 'nonexistentcontent';
       
-      // נתיב החיפוש אינו קיים במערכת, לכן מצפים לתגובת 404
+      // Route is now implemented
       const response = await request(app)
         .get(`/api/search?q=${query}`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(404);
+        .expect(200);
+      
+      expect(response.body).toHaveProperty('users');
+      expect(response.body).toHaveProperty('posts');
+      expect(Array.isArray(response.body.users)).toBe(true);
+      expect(Array.isArray(response.body.posts)).toBe(true);
+      expect(response.body.users.length).toBe(0);
+      expect(response.body.posts.length).toBe(0);
     });
   });
 });

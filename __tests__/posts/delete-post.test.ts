@@ -87,6 +87,7 @@ describe('Delete Post API', () => {
 
     expect(response.status).toBe(401);
     expect(response.body).toHaveProperty('message');
+    expect(response.body.message).toContain('Access token is required');
     
     // Verify post was not deleted
     const post = await Post.findById(testPost._id);

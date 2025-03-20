@@ -50,10 +50,14 @@ describe('Google OAuth Login', () => {
     const response = await request(app)
       .post('/api/auth/google')
       .send(googleData)
-      .expect(400);
+      .expect(200);
 
     expect(response.body).toHaveProperty('message');
-    expect(response.body.message).toBe('Invalid Google token or missing user data');
+    expect(response.body.message).toBe('Google authentication successful');
+    expect(response.body).toHaveProperty('user');
+    expect(response.body).toHaveProperty('accessToken');
+    expect(response.body).toHaveProperty('refreshToken');
+    expect(response.body.user.email).toBe(googleData.email);
   });
 
   test('should login existing user with Google', async () => {
@@ -75,10 +79,12 @@ describe('Google OAuth Login', () => {
     const response = await request(app)
       .post('/api/auth/google')
       .send(googleData)
-      .expect(400);
+      .expect(200);
 
     expect(response.body).toHaveProperty('message');
-    expect(response.body.message).toBe('Invalid Google token or missing user data');
+    expect(response.body.message).toBe('Google authentication successful');
+    expect(response.body).toHaveProperty('user');
+    expect(response.body.user.email).toBe(googleData.email);
   });
 
   test('should return an error if required Google data is missing', async () => {

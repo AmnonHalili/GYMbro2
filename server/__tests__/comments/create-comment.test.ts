@@ -63,14 +63,15 @@ describe('Create Comment API', () => {
       .send(commentData)
       .expect(201);
 
-    expect(response.body).toHaveProperty('id');
-    expect(response.body).toHaveProperty('content', commentData.content);
-    expect(response.body).toHaveProperty('user');
-    expect(response.body.user.id).toBe(testUser._id.toString());
-    expect(response.body).toHaveProperty('post', testPost._id.toString());
+    expect(response.body).toHaveProperty('comment');
+    expect(response.body.comment).toHaveProperty('id');
+    expect(response.body.comment).toHaveProperty('content', commentData.content);
+    expect(response.body.comment).toHaveProperty('user');
+    expect(response.body.comment.user.id).toBe(testUser._id.toString());
+    expect(response.body.comment).toHaveProperty('post', testPost._id.toString());
     
     // Verify comment was created in database
-    const comment = await Comment.findById(response.body.id);
+    const comment = await Comment.findById(response.body.comment.id);
     expect(comment).not.toBeNull();
     expect(comment?.content).toBe(commentData.content);
     

@@ -10,7 +10,12 @@ let refreshToken: string;
 let userId: string;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
+  mongoServer = await MongoMemoryServer.create({
+    instance: {
+      port: 27020, // Unique port different from other test files
+      storageEngine: 'ephemeralForTest'
+    }
+  });
   const uri = mongoServer.getUri();
   await mongoose.connect(uri);
   
@@ -29,9 +34,13 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await User.deleteMany({});
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  try {
+    await User.deleteMany({});
+    await mongoose.disconnect();
+    await mongoServer.stop();
+  } catch (error) {
+    console.error('Error shutting down MongoDB:', error);
+  }
 });
 
 describe('Refresh Token Tests', () => {

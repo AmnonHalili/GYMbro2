@@ -13,7 +13,12 @@ let testPost: any;
 let accessToken: string;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
+  mongoServer = await MongoMemoryServer.create({
+    instance: {
+      port: 27022, // Unique port different from other test files
+      storageEngine: 'ephemeralForTest'
+    }
+  });
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri);
 
@@ -30,23 +35,35 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  // Create a test post before each test
-  testPost = new Post({
-    user: testUser._id,
-    content: 'Test post for comments'
-  });
-  await testPost.save();
+  try {
+    // Create a test post before each test
+    testPost = new Post({
+      user: testUser._id,
+      content: 'Test post for comments'
+    });
+    await testPost.save();
+  } catch (error) {
+    console.error('Error in beforeEach:', error);
+  }
 });
 
 afterEach(async () => {
-  await Post.deleteMany({});
-  await Comment.deleteMany({});
+  try {
+    await Post.deleteMany({});
+    await Comment.deleteMany({});
+  } catch (error) {
+    console.error('Error in afterEach:', error);
+  }
 });
 
 afterAll(async () => {
-  await User.deleteMany({});
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  try {
+    await User.deleteMany({});
+    await mongoose.disconnect();
+    await mongoServer.stop();
+  } catch (error) {
+    console.error('Error in afterAll:', error);
+  }
 });
 
 describe('Create Comment API', () => {

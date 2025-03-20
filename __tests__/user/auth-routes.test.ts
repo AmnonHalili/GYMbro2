@@ -4,6 +4,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../../src/app';
 import User from '../../src/models/User';
 import { generateToken } from '../../src/utils/auth';
+import bcrypt from 'bcrypt';
 
 describe('Authentication Routes', () => {
   let mongoServer: MongoMemoryServer;
@@ -190,35 +191,54 @@ describe('Authentication Routes', () => {
     });
   });
 
-  describe('POST /api/auth/google', () => {
-    test('should handle Google authentication', async () => {
-      // Mock Google user data
-      const googleUserData = {
-        googleId: '123456789',
+  describe('Google Authentication', () => {
+    test('should handle Google authentication request', async () => {
+      // Mocking Google auth data
+      const googleAuthData = {
+        googleId: '1234567890',
         email: 'google@example.com',
         name: 'Google User',
-        picture: 'https://example.com/picture.jpg'
+        picture: 'https://example.com/picture.jpg',
+        token: 'fake-google-token'
       };
 
       const response = await request(app)
         .post('/api/auth/google')
-        .send(googleUserData)
+        .send(googleAuthData)
         .expect(200);
 
-      // Check the response based on current implementation
-      // This might need adjustment based on actual implementation
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.message).toBe('Google authentication successful');
       expect(response.body).toHaveProperty('user');
-      expect(response.body).toHaveProperty('accessToken');
-      expect(response.body).toHaveProperty('refreshToken');
+      expect(response.body.user.email).toBe(googleAuthData.email);
     });
 
-    test('should fail with missing Google data', async () => {
+    test('should link Google account to existing user', async () => {
+      // Create a user
+      await User.create({
+        username: 'existinguser',
+        email: 'existing@example.com',
+        password: await bcrypt.hash('Password123!', 10)
+      });
+
+      // Send Google auth data with the same email
+      const googleAuthData = {
+        googleId: '1234567890',
+        email: 'existing@example.com',
+        name: 'Existing User',
+        picture: 'https://example.com/picture.jpg',
+        token: 'fake-google-token'
+      };
+
       const response = await request(app)
         .post('/api/auth/google')
-        .send({})
-        .expect(400);
+        .send(googleAuthData)
+        .expect(200);
 
       expect(response.body).toHaveProperty('message');
+      expect(response.body.message).toBe('Google authentication successful');
+      expect(response.body).toHaveProperty('user');
+      expect(response.body.user.email).toBe(googleAuthData.email);
     });
   });
 

@@ -7,21 +7,34 @@ import { createTestUser } from '../setup';
 let mongoServer: MongoMemoryServer;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
+  mongoServer = await MongoMemoryServer.create({
+    instance: {
+      port: 27019,
+      storageEngine: 'ephemeralForTest'
+    }
+  });
   const uri = mongoServer.getUri();
   await mongoose.connect(uri);
 });
 
 afterEach(async () => {
-  const collections = mongoose.connection.collections;
-  for (const key in collections) {
-    await collections[key].deleteMany({});
+  try {
+    const collections = mongoose.connection.collections;
+    for (const key in collections) {
+      await collections[key].deleteMany({});
+    }
+  } catch (error) {
+    console.error('Error cleaning up:', error);
   }
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  try {
+    await mongoose.disconnect();
+    await mongoServer.stop();
+  } catch (error) {
+    console.error('Error shutting down MongoDB:', error);
+  }
 });
 
 describe('User Login Tests', () => {

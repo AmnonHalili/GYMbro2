@@ -10,7 +10,7 @@ export const createComment = async (req: Request, res: Response): Promise<void> 
     const user = (req as any).user;
     
     if (!user) {
-      res.status(401).json({ message: 'User not authenticated' });
+      res.status(401).json({ message: 'Access token is required' });
       return;
     }
     
@@ -44,18 +44,16 @@ export const createComment = async (req: Request, res: Response): Promise<void> 
     await post.save();
     
     // Return comment with user details
-    res.status(201).json({
-      comment: {
-        id: comment._id,
-        content: comment.content,
-        createdAt: comment.get('createdAt'),
-        user: {
-          id: user._id,
-          username: user.username,
-          profilePicture: user.profilePicture
-        }
-      },
-      commentsCount: post.commentsCount
+    res.status(201).json({ comment: {
+      id: comment._id,
+      post: postId,
+      content: comment.content,
+      createdAt: comment.get('createdAt'),
+      user: {
+        id: user._id,
+        username: user.username,
+        profilePicture: user.profilePicture || ''
+      }
     });
   } catch (error) {
     console.error('Error creating comment:', error);

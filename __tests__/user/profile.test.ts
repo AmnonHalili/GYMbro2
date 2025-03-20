@@ -132,6 +132,7 @@ describe('User Profile API', () => {
 
     expect(response.status).toBe(401);
     expect(response.body).toHaveProperty('message');
+    expect(response.body.message).toContain('Access token is required');
   });
 
   test('should return 404 if user does not exist', async () => {
@@ -171,6 +172,7 @@ describe('User Profile API', () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toHaveProperty('message');
+    expect(response.body.message).toContain('Access token is required');
     
     // Clean up
     fs.unlinkSync(invalidImagePath);

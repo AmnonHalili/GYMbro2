@@ -10,7 +10,7 @@ export const toggleLike = async (req: Request, res: Response): Promise<void> => 
     const user = (req as any).user;
     
     if (!user) {
-      res.status(401).json({ message: 'User not authenticated' });
+      res.status(401).json({ message: 'Access token is required' });
       return;
     }
     
@@ -35,6 +35,12 @@ export const toggleLike = async (req: Request, res: Response): Promise<void> => 
       // Decrement likes count on the post
       post.likesCount = Math.max((post.likesCount || 0) - 1, 0);
       await post.save();
+      
+      res.status(200).json({
+        message: 'Post unliked successfully',
+        liked: false,
+        likesCount: post.likesCount
+      });
     } else {
       // User hasn't liked the post yet, so like it
       const newLike = new Like({
@@ -48,14 +54,12 @@ export const toggleLike = async (req: Request, res: Response): Promise<void> => 
       post.likesCount = (post.likesCount || 0) + 1;
       await post.save();
       
-      liked = true;
+      res.status(201).json({
+        message: 'Post liked successfully',
+        liked: true,
+        likesCount: post.likesCount
+      });
     }
-    
-    res.status(200).json({
-      message: liked ? 'Post liked successfully' : 'Post unliked successfully',
-      liked,
-      likesCount: post.likesCount
-    });
   } catch (error) {
     console.error('Error toggling like:', error);
     res.status(500).json({ message: 'Server error while toggling like' });
@@ -69,7 +73,7 @@ export const checkLikeStatus = async (req: Request, res: Response): Promise<void
     const user = (req as any).user;
     
     if (!user) {
-      res.status(401).json({ message: 'User not authenticated' });
+      res.status(401).json({ message: 'Access token is required' });
       return;
     }
     

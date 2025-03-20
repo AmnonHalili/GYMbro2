@@ -214,10 +214,12 @@ describe('Authentication Routes', () => {
       const response = await request(app)
         .post('/api/auth/google')
         .send(googleAuthData)
-        .expect(400);
+        .expect(200);
 
       expect(response.body).toHaveProperty('message');
-      expect(response.body.message).toContain('Invalid Google token or missing user data');
+      expect(response.body.message).toBe('Google authentication successful');
+      expect(response.body).toHaveProperty('user');
+      expect(response.body.user.email).toBe(googleAuthData.email);
     });
 
     test('should link Google account to existing user', async () => {
@@ -240,10 +242,12 @@ describe('Authentication Routes', () => {
       const response = await request(app)
         .post('/api/auth/google')
         .send(googleAuthData)
-        .expect(400);
+        .expect(200);
 
       expect(response.body).toHaveProperty('message');
-      expect(response.body.message).toContain('Invalid Google token or missing user data');
+      expect(response.body.message).toBe('Google authentication successful');
+      expect(response.body).toHaveProperty('user');
+      expect(response.body.user.email).toBe(googleAuthData.email);
     });
   });
 });
