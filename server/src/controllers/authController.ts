@@ -14,17 +14,36 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const { username, email, password } = req.body;
     console.log('Register attempt:', { username, email, hasPassword: !!password });
 
+    // וידוא שכל השדות הנדרשים קיימים
+    if (!username || !email || !password) {
+      res.status(400).json({ 
+        message: 'Missing required fields',
+        details: {
+          username: !username ? 'Username is required' : null,
+          email: !email ? 'Email is required' : null,
+          password: !password ? 'Password is required' : null
+        }
+      });
+      return;
+    }
+
     // Check if email already exists
     const emailExists = await User.findOne({ email });
     if (emailExists) {
-      res.status(400).json({ message: 'Email already exists' });
+      res.status(400).json({ 
+        message: 'Email already exists',
+        field: 'email'
+      });
       return;
     }
 
     // Check if username already exists
     const usernameExists = await User.findOne({ username });
     if (usernameExists) {
-      res.status(400).json({ message: 'Username already exists' });
+      res.status(400).json({ 
+        message: 'Username already exists',
+        field: 'username'
+      });
       return;
     }
 
@@ -61,34 +80,52 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Regular user registration
-    const user = new User({
-      username,
-      email,
-      password // User model will hash this automatically
-    });
+    try {
+      const user = new User({
+        username,
+        email,
+        password // User model will hash this automatically
+      });
 
-    await user.save();
-    // Explicit cast to make TypeScript happy
-    const userId = (user._id as mongoose.Types.ObjectId).toString();
-    console.log('User saved successfully:', userId);
+      await user.save();
+      // Explicit cast to make TypeScript happy
+      const userId = (user._id as mongoose.Types.ObjectId).toString();
+      console.log('User saved successfully:', userId);
 
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user as IUser & { _id: mongoose.Types.ObjectId });
+      // Generate tokens
+      const { accessToken, refreshToken } = generateTokens(user as IUser & { _id: mongoose.Types.ObjectId });
 
-    res.status(201).json({
-      message: 'User registered successfully',
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        profilePicture: user.profilePicture
-      },
-      accessToken,
-      refreshToken
-    });
-  } catch (error) {
+      res.status(201).json({
+        message: 'User registered successfully',
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          profilePicture: user.profilePicture
+        },
+        accessToken,
+        refreshToken
+      });
+    } catch (saveError: any) {
+      console.error('Error saving user:', saveError);
+      if (saveError.name === 'ValidationError') {
+        res.status(400).json({
+          message: 'Validation error',
+          details: Object.keys(saveError.errors).reduce((acc: any, key) => {
+            acc[key] = saveError.errors[key].message;
+            return acc;
+          }, {})
+        });
+        return;
+      }
+      throw saveError;
+    }
+  } catch (error: any) {
     console.error('Register error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ 
+      message: 'Server error',
+      details: error.message
+    });
   }
 };
 
