@@ -128,37 +128,76 @@ export const getUserPosts = async (req: Request, res: Response) => {
 // Update user profile
 export const updateProfile = async (req: Request, res: Response) => {
   try {
+    console.log('[userController] updateProfile was called with body:', req.body);
+    console.log('[userController] updateProfile request headers:', req.headers);
+    
     const userFromReq = (req as any).user;
     
     if (!userFromReq || !userFromReq._id) {
+      console.error('[userController] User not authenticated in updateProfile');
       return res.status(401).json({ message: 'User not authenticated' });
     }
     
     const userId = userFromReq._id.toString();
+    console.log(`[userController] Updating profile for user ID: ${userId}`);
+    
+    // לוג ערכי קלט
+    console.log('[userController] Request body:', {
+      username: req.body.username,
+      bio: req.body.bio,
+      hasFile: !!req.file,
+      contentType: req.headers['content-type']
+    });
+    
     const { username, bio } = req.body;
     
     // Get fresh user data from database to avoid type issues
     const user = await User.findById(userId);
     if (!user) {
+      console.error(`[userController] User ${userId} not found in database`);
       return res.status(404).json({ message: 'User not found' });
     }
+    
+    console.log(`[userController] Current user data:`, {
+      id: user._id.toString(),
+      currentUsername: user.username,
+      newUsername: username,
+      currentBio: user.bio,
+      newBio: bio
+    });
 
     // Check if username is already taken
     if (username && username !== user.username) {
+      console.log(`[userController] Checking if username "${username}" is available`);
       const existingUser = await User.findOne({ username });
       if (existingUser) {
+        console.log(`[userController] Username "${username}" is already taken by user ${existingUser._id}`);
         return res.status(409).json({ message: 'Username is already taken' });
       }
       
+      console.log(`[userController] Username "${username}" is available, updating from "${user.username}"`);
       user.username = username;
+    } else {
+      console.log(`[userController] Username unchanged: ${user.username}`);
     }
     
     // Update bio if provided
     if (bio !== undefined) {
+      console.log(`[userController] Updating bio from "${user.bio}" to "${bio}"`);
       user.bio = bio;
     }
     
+    // סיכום השינויים
+    const changes = {
+      username: user.username !== userFromReq.username ? 
+        { from: userFromReq.username, to: user.username } : 'unchanged',
+      bio: user.bio !== userFromReq.bio ? 
+        { from: userFromReq.bio, to: user.bio } : 'unchanged'
+    };
+    console.log(`[userController] Changes to be saved:`, changes);
+    
     await user.save();
+    console.log(`[userController] User ${userId} profile updated successfully`);
     
     res.status(200).json({
       message: 'Profile updated successfully',
@@ -171,7 +210,7 @@ export const updateProfile = async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('Update profile error:', error);
+    console.error('[userController] Update profile error:', error);
     res.status(500).json({ message: 'Server error while updating profile' });
   }
 };
@@ -225,7 +264,14 @@ export const updateProfilePicture = async (req: Request, res: Response) => {
       
       res.status(200).json({
         message: 'Profile picture updated successfully',
-        profilePicture: user.profilePicture
+        profilePicture: user.profilePicture,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          bio: user.bio,
+          profilePicture: user.profilePicture
+        }
       });
     } else {
       console.log(`לא נשלחה תמונת פרופיל חדשה`);

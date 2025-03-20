@@ -271,14 +271,16 @@ router.get('/username/:username', asyncWrapper(userController.getUserByUsername)
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               username:
  *                 type: string
- *                 description: New username (optional)
- *                 example: john_updated
+ *                 example: johndoe
+ *               bio:
+ *                 type: string
+ *                 example: I am a software developer
  *     responses:
  *       200:
  *         description: Profile updated successfully
@@ -287,15 +289,18 @@ router.get('/username/:username', asyncWrapper(userController.getUserByUsername)
  *             schema:
  *               type: object
  *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Profile updated successfully
  *                 user:
  *                   type: object
  *                   properties:
- *                     _id:
+ *                     id:
  *                       type: string
  *                       example: 6082fd3d12e87a001cb57f32
  *                     username:
  *                       type: string
- *                       example: john_updated
+ *                       example: johndoe
  *                     email:
  *                       type: string
  *                       example: john@example.com
@@ -303,13 +308,19 @@ router.get('/username/:username', asyncWrapper(userController.getUserByUsername)
  *                       type: string
  *                       example: /uploads/profiles/john-123456.jpg
  *       400:
- *         description: Validation error or username already taken
+ *         description: Invalid input data
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *       401:
  *         description: Unauthorized, authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       409:
+ *         description: Username already taken
  *         content:
  *           application/json:
  *             schema:
@@ -321,12 +332,7 @@ router.get('/username/:username', asyncWrapper(userController.getUserByUsername)
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put(
-  '/profile',
-  authenticateToken,
-  validate(profileUpdateValidation),
-  asyncWrapper(userController.updateProfile)
-);
+router.put('/profile', authenticateToken, uploadProfileImage, asyncWrapper(userController.updateProfile));
 
 /**
  * @swagger
@@ -397,5 +403,80 @@ router.put(
   },
   asyncWrapper(userController.updateProfilePicture)
 );
+
+/**
+ * @swagger
+ * /api/users/profile-update:
+ *   put:
+ *     summary: Update user profile
+ *     description: Update the current user's profile information.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 example: johndoe
+ *               bio:
+ *                 type: string
+ *                 example: I am a software developer
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Profile updated successfully
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       example: 6082fd3d12e87a001cb57f32
+ *                     username:
+ *                       type: string
+ *                       example: johndoe
+ *                     email:
+ *                       type: string
+ *                       example: john@example.com
+ *                     profilePicture:
+ *                       type: string
+ *                       example: /uploads/profiles/john-123456.jpg
+ *       400:
+ *         description: Invalid input data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized, authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       409:
+ *         description: Username already taken
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.put('/profile-update', authenticateToken, asyncWrapper(userController.updateProfile));
 
 export default router;

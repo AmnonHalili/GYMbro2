@@ -18,6 +18,7 @@ interface AuthContextProps {
   register: (credentials: RegisterCredentials) => Promise<void>;
   googleLogin: (googleToken: string) => Promise<void>;
   logout: () => void;
+  updateUser: (user: User) => void;
 }
 
 // Initial state
@@ -40,6 +41,7 @@ type AuthAction =
   | { type: 'REGISTER_SUCCESS'; payload: User }
   | { type: 'REGISTER_FAIL'; payload: string }
   | { type: 'LOGOUT' }
+  | { type: 'UPDATE_USER'; payload: User }
   | { type: 'CLEAR_ERRORS' };
 
 // Reducer
@@ -59,6 +61,12 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isAuthenticated: true,
         user: action.payload,
         loading: false,
+        error: null,
+      };
+    case 'UPDATE_USER':
+      return {
+        ...state,
+        user: action.payload,
         error: null,
       };
     case 'AUTH_ERROR':
@@ -282,6 +290,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     dispatch({ type: 'LOGOUT' });
   };
 
+  // Update user
+  const updateUser = (user: User): void => {
+    dispatch({ type: 'UPDATE_USER', payload: user });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -291,6 +304,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         register,
         googleLogin,
         logout,
+        updateUser,
       }}
     >
       {children}

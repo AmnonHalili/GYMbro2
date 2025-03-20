@@ -200,11 +200,14 @@
 }
 
 .post-image {
-  width: 100%;
-  max-height: 300px;
-  object-fit: cover;
+  width: auto !important;
+  max-height: 250px !important;
+  max-width: 500px !important;
+  height: auto !important;
+  object-fit: contain !important;
   border-radius: 8px;
-  margin-top: auto;
+  margin: 10px auto !important;
+  display: block;
 }
 
 .card-footer {
@@ -257,10 +260,12 @@
 }
 
 .profile-avatar {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  object-fit: cover;
+  max-width: 250px;
+  max-height: 250px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  margin: 0 auto;
 }
 
 .profile-info {
@@ -400,4 +405,36 @@
 
 .post-list > div, .row > div {
   animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* סגנונות נוספים לתמונות פרופיל */
+.user-avatar, .post-avatar {
+  max-width: 100px;
+  max-height: 100px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* הגבלת גודל תמונות בתצוגת עריכת פרופיל */
+.profile-picture-preview img {
+  max-width: 200px !important;
+  max-height: 200px !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  margin: 0 auto;
+  display: block;
+}
+
+/* הגדרות נוספות לתמונות בדף הפרופיל */
+.profile-picture img,
+.profile-picture-preview img {
+  max-width: 200px !important;
+  max-height: 200px !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  margin: 0 auto;
+  display: block;
 }

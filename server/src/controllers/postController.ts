@@ -211,8 +211,8 @@ export const createPost = async (req: RequestWithUser, res: Response): Promise<v
       } else {
         console.log(`אזהרה: הקובץ לא נמצא בנתיב ${fullPath}!`);
       }
-    }
-    
+      }
+      
     // אם קיים גם קובץ מצורף, בדוק אותו
     if (req.file) {
       console.log(`תמונה הועלתה: ${req.file.filename}. בודק אם הקובץ קיים במערכת הקבצים...`);

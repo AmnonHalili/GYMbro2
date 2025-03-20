@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import * as userService from '../services/userService';
 
 const EditProfile: React.FC = () => {
-  const { authState } = useAuth();
+  const { authState, updateUser } = useAuth();
   const navigate = useNavigate();
   
   const [username, setUsername] = useState('');
@@ -79,25 +79,53 @@ const EditProfile: React.FC = () => {
     setError(null);
     
     try {
-      const formData = new FormData();
-      formData.append('username', username);
+      // בדיקה אם רק התמונה משתנה או גם השם משתמש
+      const isOnlyProfilePictureChange = username === authState.user?.username;
       
-      if (profilePicture) {
-        formData.append('profilePicture', profilePicture);
-      } else if (previewURL === null && authState.user?.profilePicture) {
-        // אם המשתמש הסיר את התמונה המקורית, נשלח סימון למחיקת התמונה
-        formData.append('removeProfilePicture', 'true');
+      let updatedUser = null;
+      
+      if (isOnlyProfilePictureChange && profilePicture) {
+        // אם רק התמונה משתנה, נשתמש בנתיב ייעודי לעדכון תמונת פרופיל
+        const pictureFormData = new FormData();
+        pictureFormData.append('profilePicture', profilePicture);
+        
+        const response = await userService.updateProfilePicture(pictureFormData);
+        console.log('תמונת פרופיל עודכנה בהצלחה:', response);
+        updatedUser = response.user;
+        
+        setSuccess(true);
+      } else {
+        // עדכון פרופיל מלא (שם משתמש ו/או תמונה)
+        const formData = new FormData();
+        formData.append('username', username);
+        
+        if (profilePicture) {
+          formData.append('profilePicture', profilePicture);
+        } else if (previewURL === null && authState.user?.profilePicture) {
+          // אם המשתמש הסיר את התמונה המקורית, נשלח סימון למחיקת התמונה
+          formData.append('removeProfilePicture', 'true');
+        }
+        
+        // עדכון פרופיל המשתמש
+        const response = await userService.updateProfile(formData);
+        console.log('פרופיל עודכן בהצלחה:', response);
+        updatedUser = response.user;
+        
+        setSuccess(true);
       }
       
-      // עדכון פרופיל המשתמש
-      const response = await userService.updateProfile(formData);
+      // עדכון מידע המשתמש בקונטקסט
+      if (updatedUser && updateUser) {
+        console.log('מעדכן מידע משתמש בקונטקסט:', updatedUser);
+        updateUser(updatedUser);
+      } else {
+        console.warn('לא ניתן לעדכן את נתוני המשתמש בקונטקסט');
+      }
       
-      setSuccess(true);
-      
-      // עדכון המשתמש המחובר בקונטקסט
+      // רענון מחדש של הדף כדי לראות את השינויים
       setTimeout(() => {
         // ניווט לדף הפרופיל לאחר העדכון
-        navigate(`/profile/${authState.user?.id}`);
+        window.location.href = `/profile/${authState.user?.id}`;
       }, 1500);
       
     } catch (error: any) {

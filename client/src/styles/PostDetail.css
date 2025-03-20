@@ -97,9 +97,14 @@
 }
 
 .post-detail-image {
-  max-width: 100%;
-  height: auto;
+  max-width: 500px !important;
+  max-height: 300px !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  margin: 15px auto;
   display: block;
+  border-radius: 8px;
 }
 
 /* Comments */
@@ -605,4 +610,16 @@
     margin-top: 8px;
     align-self: flex-end;
   }
+}
+
+.post-detail-card {
+  max-width: 900px;
+  margin: 20px auto;
+}
+
+.post-detail-container img {
+  max-width: 500px !important;
+  max-height: 300px !important;
+  width: auto !important;
+  object-fit: contain !important;
 } 

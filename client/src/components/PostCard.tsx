@@ -323,12 +323,18 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostDeleted }) => {
   return (
     <div className="post-card card h-100 shadow-sm animate-fade-in" onClick={() => navigate(`/post/${postId}`)}>
       {hasImage() && (
-        <div className="post-image-container">
+        <div className="post-image-container" style={{ maxHeight: '250px', overflow: 'hidden' }}>
           <img 
             src={getPostImageSource()}
-            className="card-img-top" 
             alt="תמונת פוסט"
-            loading="lazy"
+            className="post-image"
+            style={{ 
+              maxHeight: '230px', 
+              maxWidth: '100%', 
+              width: 'auto', 
+              margin: '0 auto',
+              display: 'block'
+            }}
             onError={(e) => handleImageError(e, postId)}
           />
         </div>
