@@ -130,6 +130,7 @@ export const updateProfile = async (req: Request, res: Response) => {
   try {
     console.log('[userController] updateProfile was called with body:', req.body);
     console.log('[userController] updateProfile request headers:', req.headers);
+    console.log('[userController] updateProfile request file:', req.file);
     
     // Extract user ID from request (added by authenticateToken middleware)
     const userId = req.userId;
@@ -164,7 +165,7 @@ export const updateProfile = async (req: Request, res: Response) => {
     }
     
     // Handle profile picture if uploaded
-    if (req.body.profilePicture) {
+    if (req.file) {
       // If previously set, delete old profile picture (optional)
       if (user.profilePicture && user.profilePicture !== '/uploads/default.jpg') {
         try {
@@ -184,7 +185,8 @@ export const updateProfile = async (req: Request, res: Response) => {
       }
       
       // Set new profile picture path
-      user.profilePicture = req.body.profilePicture;
+      user.profilePicture = `/uploads/profile/${req.file.filename}`;
+      console.log(`נתיב תמונת הפרופיל החדש: ${user.profilePicture}`);
     }
     
     // Handle removing profile picture
@@ -202,7 +204,7 @@ export const updateProfile = async (req: Request, res: Response) => {
         }
       }
       
-      // Reset to default or empty
+      // Reset to default
       user.profilePicture = '/uploads/default.jpg';
     }
     

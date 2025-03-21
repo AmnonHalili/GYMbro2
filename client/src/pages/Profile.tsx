@@ -6,12 +6,9 @@ import * as postService from '../services/postService';
 import { User, Post } from '../types';
 import * as FaIcons from 'react-icons/fa';
 import PostCard from '../components/PostCard';
-<<<<<<< HEAD
 import AnonymousAvatar from '../components/AnonymousAvatar';
-import '../styles/Profile.css';
-=======
 import Chat from '../components/Chat/Chat';
->>>>>>> 23761bd470e744bbadff045868c99f15de28739a
+import '../styles/Profile.css';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId?: string }>();
@@ -27,11 +24,8 @@ const Profile: React.FC = () => {
   const [postsError, setPostsError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-<<<<<<< HEAD
   const [totalPages, setTotalPages] = useState(1);
-=======
   const [showChat, setShowChat] = useState(false);
->>>>>>> 23761bd470e744bbadff045868c99f15de28739a
 
   // הוספת משתנים לתצוגה ומיון
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -252,7 +246,7 @@ const Profile: React.FC = () => {
   const filteredAndSortedPosts = getFilteredAndSortedPosts();
 
   return (
-    <div className="container mt-4">
+    <div className="profile-container">
       {/* אזור פרטי המשתמש */}
       <div className="card shadow-sm mb-4">
         <div className="card-body">
@@ -404,11 +398,23 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
+      <div className="container">
+        <div className="row">
+          <div className="col-md-12">
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <div className="d-flex gap-2">
+               
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* אזור הצ'אט */}
-      {showChat && currentUser && (
+      {showChat && currentUser && user && (
         <div className="card shadow-sm mb-4">
           <div className="card-body">
-            <Chat targetUserId={user.id} />
+            <Chat targetUserId={user._id} />
           </div>
         </div>
       )}

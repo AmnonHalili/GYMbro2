@@ -321,7 +321,7 @@ router.get('/username/:username', asyncWrapper(userController.getUserByUsername)
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put('/profile', authenticateToken, uploadProfileImage, asyncWrapper(userController.updateProfile));
+router.put('/profile', authenticateToken, uploadProfileImage, profileUpdateValidation, asyncWrapper(userController.updateProfile));
 
 /**
  * @swagger

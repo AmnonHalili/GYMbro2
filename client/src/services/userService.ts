@@ -38,13 +38,14 @@ export const updateProfile = async (formData: FormData): Promise<{
 }> => {
   console.log('שולח בקשת עדכון פרופיל לשרת...');
   
-  // לוג של תוכן הפורם-דאטה לצורך דיבוג - שימוש בגישה שתואמת TypeScript
-  const formDataEntries = Array.from(formData.keys()).map(key => ({
-    key,
-    value: formData.get(key)
-  }));
-  formDataEntries.forEach(entry => {
-    console.log(`[FormData] ${entry.key}: ${entry.value}`);
+  // לוג של תוכן הפורם-דאטה לצורך דיבוג
+  const formDataEntries = Array.from(formData.entries());
+  formDataEntries.forEach(([key, value]) => {
+    if (value instanceof File) {
+      console.log(`[FormData] ${key}: File - ${value.name} (${value.type})`);
+    } else {
+      console.log(`[FormData] ${key}: ${value}`);
+    }
   });
   
   const response = await api.put('/users/profile', formData, {
